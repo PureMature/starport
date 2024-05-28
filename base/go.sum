@@ -1,6 +1,4 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
-github.com/1set/starlet v0.1.1 h1:QzNgfPG5LleqcvvYJ8NZhb8ANLG7mFDrAWq9wYKramY=
-github.com/1set/starlet v0.1.1/go.mod h1:CUUuoFBHm0vdj5YJsWHJUHhiV79jjn4V4PZ2gQtY2o8=
 github.com/1set/starlet v0.1.2-0.20240528100323-c91e367021b8 h1:U2PR2+cPXcsjmLVKkDcSmQAHGkHFAkEKi9hTOCJGlAU=
 github.com/1set/starlet v0.1.2-0.20240528100323-c91e367021b8/go.mod h1:CUUuoFBHm0vdj5YJsWHJUHhiV79jjn4V4PZ2gQtY2o8=
 github.com/1set/starlight v0.1.1 h1:U9qKgq3TvmyWDVx4KmGEAOIoTDAxxG+txzzDAAMYLEA=

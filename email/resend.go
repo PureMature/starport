@@ -12,7 +12,6 @@ import (
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv"
 	"github.com/1set/starlet/dataconv/types"
-	"github.com/PureMature/starcli/util"
 	"github.com/resend/resend-go/v2"
 	"github.com/samber/lo"
 	"github.com/yuin/goldmark"
@@ -70,7 +69,7 @@ func (m *EmailModule) genSendFunc() starlark.Callable {
 		senderDomain, _ := m.baseModule.GetConfig("sender_domain")
 
 		// parse args
-		newOneOrListStr := func() *util.OneOrMany[starlark.String] { return util.NewOneOrManyNoDefault[starlark.String]() }
+		newOneOrListStr := func() *types.OneOrMany[starlark.String] { return types.NewOneOrManyNoDefault[starlark.String]() }
 		var (
 			subject            types.StringOrBytes         // must be set
 			bodyHTML           types.NullableStringOrBytes // one of the three must be set
@@ -84,7 +83,7 @@ func (m *EmailModule) genSendFunc() starlark.Callable {
 			replyAddress       types.StringOrBytes // two of them are optional
 			replyNameID        types.StringOrBytes
 			attachmentFiles    = newOneOrListStr()
-			attachmentContents = util.NewOneOrManyNoDefault[*starlark.Dict]()
+			attachmentContents = types.NewOneOrManyNoDefault[*starlark.Dict]()
 		)
 		if err := starlark.UnpackArgs(b.Name(), args, kwargs,
 			"subject", &subject,

@@ -11,23 +11,23 @@ import (
 // ConfigGetter is a function type that returns a value of type T.
 type ConfigGetter[T any] func() T
 
-// BaseModule provides a generic base module that can be extended with different configurations.
-type BaseModule[T any] struct {
+// ConfigurableModule provides a generic base module that can be extended with different configurations.
+type ConfigurableModule[T any] struct {
 	configs map[string]ConfigGetter[T]
 }
 
-// NewBaseModule creates a new instance of BaseModule.
-func NewBaseModule[T any]() *BaseModule[T] {
-	return &BaseModule[T]{configs: make(map[string]ConfigGetter[T])}
+// NewConfigurableModule creates a new instance of ConfigurableModule.
+func NewConfigurableModule[T any]() *ConfigurableModule[T] {
+	return &ConfigurableModule[T]{configs: make(map[string]ConfigGetter[T])}
 }
 
 // SetConfig sets a configuration getter for a given name.
-func (m *BaseModule[T]) SetConfig(name string, getter ConfigGetter[T]) {
+func (m *ConfigurableModule[T]) SetConfig(name string, getter ConfigGetter[T]) {
 	m.configs[name] = getter
 }
 
 // genSetConfig generates a Starlark callable function to set a configuration value.
-func (m *BaseModule[T]) genSetConfig(name string) starlark.Callable {
+func (m *ConfigurableModule[T]) genSetConfig(name string) starlark.Callable {
 	return starlark.NewBuiltin(name, func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 		var v starlark.Value
 		if err := starlark.UnpackArgs(b.Name(), args, kwargs, name, &v); err != nil {
@@ -50,17 +50,17 @@ func (m *BaseModule[T]) genSetConfig(name string) starlark.Callable {
 }
 
 // GetConfig retrieves the configuration value for a given name.
-func (m *BaseModule[T]) GetConfig(name string) (T, error) {
+func (m *ConfigurableModule[T]) GetConfig(name string) (T, error) {
 	getter, exists := m.configs[name]
 	if !exists || getter == nil {
 		var zero T
-		return zero, fmt.Errorf("config %s is not set", name)
+		return zero, fmt.Errorf("config %s not set", name)
 	}
 	return getter(), nil
 }
 
 // LoadModule returns a Starlark module loader with the given configurations and additional functions.
-func (m *BaseModule[T]) LoadModule(moduleName string, additionalFuncs starlark.StringDict) starlet.ModuleLoader {
+func (m *ConfigurableModule[T]) LoadModule(moduleName string, additionalFuncs starlark.StringDict) starlet.ModuleLoader {
 	sd := starlark.StringDict{}
 	for name := range m.configs {
 		sd["set_"+name] = m.genSetConfig(name)

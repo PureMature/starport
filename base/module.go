@@ -50,7 +50,7 @@ func (m *BaseModule[T]) genSetConfig(name string) starlark.Callable {
 
 func (m *BaseModule[T]) GetConfig(name string) (T, error) {
 	getter, exists := m.configs[name]
-	if !exists {
+	if !exists || getter == nil {
 		var zero T
 		return zero, fmt.Errorf("config %s not set", name)
 	}

@@ -87,11 +87,11 @@ func (m *Module) genSendFunc() starlark.Callable {
 		)
 		if err := starlark.UnpackArgs(b.Name(), args, kwargs,
 			"subject", &subject,
-			"body_html?", &bodyHTML, "body_text?", &bodyText, "body_markdown?", &bodyMarkdown,
+			"html?", &bodyHTML, "text?", &bodyText, "markdown?", &bodyMarkdown,
 			"to", toAddresses, "cc?", ccAddresses, "bcc?", bccAddresses,
 			"from?", &fromAddress, "from_id?", &fromNameID,
 			"reply_to?", &replyAddress, "reply_id?", &replyNameID,
-			"attachment_files?", attachmentFiles, "attachment?", attachmentContents); err != nil {
+			"attachment_file?", attachmentFiles, "attachment?", attachmentContents); err != nil {
 			return starlark.None, err
 		}
 
@@ -108,16 +108,28 @@ func (m *Module) genSendFunc() starlark.Callable {
 
 		// convert from to send address
 		var sendAddr string
-		if fromAddr := fromAddress.GoString(); ystring.IsNotBlank(fromAddr) {
-			sendAddr = fromAddr
-		} else if fromID := fromNameID.GoString(); ystring.IsNotBlank(fromID) {
+		if fa := fromAddress.GoString(); ystring.IsNotBlank(fa) {
+			sendAddr = fa
+		} else if fi := fromNameID.GoString(); ystring.IsNotBlank(fi) {
 			if ystring.IsNotBlank(senderDomain) {
-				sendAddr = fromID + "@" + senderDomain
+				sendAddr = fi + "@" + senderDomain
 			} else {
 				return starlark.None, fmt.Errorf("sender_domain should be set when from_id is used")
 			}
 		} else {
 			return starlark.None, fmt.Errorf("no valid from or from_id found")
+		}
+
+		// convert from to reply address
+		var replyAddr string
+		if ra := replyAddress.GoString(); ystring.IsNotBlank(ra) {
+			replyAddr = ra
+		} else if ri := replyNameID.GoString(); ystring.IsNotBlank(ri) {
+			if ystring.IsNotBlank(senderDomain) {
+				replyAddr = ri + "@" + senderDomain
+			} else {
+				return starlark.None, fmt.Errorf("sender_domain should be set when reply_id is used")
+			}
 		}
 
 		// prepare request
@@ -133,6 +145,7 @@ func (m *Module) genSendFunc() starlark.Callable {
 			To:      convGoString(toAddresses.Slice()),
 			Cc:      convGoString(ccAddresses.Slice()),
 			Bcc:     convGoString(bccAddresses.Slice()),
+			ReplyTo: replyAddr,
 			Subject: subject.GoString(),
 		}
 

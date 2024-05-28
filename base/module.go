@@ -1,3 +1,4 @@
+// Package base provides a generic base module that can be extended with different configurations.
 package base
 
 import (

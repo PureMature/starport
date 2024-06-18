@@ -2,15 +2,16 @@
 package llm
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"strings"
-
 	"github.com/1set/starlet"
+	"github.com/1set/starlet/dataconv/types"
 	"github.com/PureMature/starport/base"
+	oai "github.com/sashabaranov/go-openai"
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
-
-	oai "github.com/sashabaranov/go-openai"
+	"strings"
 )
 
 // ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('llm', 'chat')
@@ -62,13 +63,17 @@ func (m *Module) LoadModule() starlet.ModuleLoader {
 	return m.cfgMod.LoadModule(ModuleName, additionalFuncs)
 }
 
+var (
+	none = starlark.None
+)
+
 func newMessageStruct(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	// Parse arguments
 	var (
 		message starlark.String
 	)
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "message", &message); err != nil {
-		return nil, err
+		return none, err
 	}
 
 	// Create a new message struct
@@ -79,6 +84,67 @@ func newMessageStruct(thread *starlark.Thread, b *starlark.Builtin, args starlar
 
 func (m *Module) genChatFunc() starlark.Callable {
 	return starlark.NewBuiltin(ModuleName+".chat", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		var (
+			textMsg   types.NullableStringOrBytes
+			userModel types.NullableStringOrBytes
+		)
+		if err := starlark.UnpackArgs(b.Name(), args, kwargs, "text?", textMsg, "model?", &userModel); err != nil {
+			return none, err
+		}
+
+		// get model
+		model := m.getModel("openai_gpt_model", userModel.GoString())
+		if model == "" {
+			return none, errors.New("gpt model is not set")
+		}
+
+		// get client
+		cli, err := m.getClient(model)
+		if err != nil {
+			return nil, err
+		}
+
+		// call OpenAI API
+		msg := oai.ChatCompletionMessage{
+			Role:    oai.ChatMessageRoleUser,
+			Content: textMsg.GoString(),
+		}
+		resp, err := cli.CreateChatCompletion(
+			context.Background(), // TODO: for context cancel
+			//oai.ChatCompletionRequest{
+			//	Model:            "",
+			//	Messages:         nil,
+			//	MaxTokens:        0,
+			//	Temperature:      0,
+			//	TopP:             0,
+			//	N:                0,
+			//	Stream:           false,
+			//	Stop:             nil,
+			//	PresencePenalty:  0,
+			//	ResponseFormat:   nil,
+			//	Seed:             nil,
+			//	FrequencyPenalty: 0,
+			//	LogitBias:        nil,
+			//	LogProbs:         false,
+			//	TopLogProbs:      0,
+			//	User:             "",
+			//	Functions:        nil,
+			//	FunctionCall:     nil,
+			//	Tools:            nil,
+			//	ToolChoice:       nil,
+			//	StreamOptions:    nil,
+			//},
+			oai.ChatCompletionRequest{
+				Model:    model,
+				Messages: []oai.ChatCompletionMessage{msg},
+			},
+		)
+		if err != nil {
+			return none, err
+		}
+		fmt.Println("Result:", resp)
+		return starlark.String(resp.Choices[0].Message.Content), nil
+
 		//// Load config
 		//provider, err := m.cfgMod.GetConfig("openai_provider")
 		//if err != nil {
@@ -88,7 +154,7 @@ func (m *Module) genChatFunc() starlark.Callable {
 		//if err != nil {
 		//	return starlark.None, err
 		//}
-		return starlark.None, nil
+		//return none, nil
 	})
 }
 
@@ -103,7 +169,7 @@ func (m *Module) genDrawFunc() starlark.Callable {
 		//if err != nil {
 		//	return starlark.None, err
 		//}
-		return starlark.None, nil
+		return none, nil
 	})
 }
 

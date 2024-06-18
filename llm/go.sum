@@ -17,8 +17,8 @@ github.com/h2so5/here v0.0.0-20200815043652-5e14eb691fae h1:ghqI9EdSyyIL2iuOM9UI
 github.com/h2so5/here v0.0.0-20200815043652-5e14eb691fae/go.mod h1:Q+Ziz4FsuRTHql1UqcQ3iZwl9LcKpi7mVVgn20Rj+IU=
 github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
-github.com/sashabaranov/go-openai v1.25.0 h1:3h3DtJ55zQJqc+BR4y/iTcPhLk4pewJpyO+MXW2RdW0=
-github.com/sashabaranov/go-openai v1.25.0/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
+github.com/sashabaranov/go-openai v1.24.1 h1:DWK95XViNb+agQtuzsn+FyHhn3HQJ7Va8z04DQDJ1MI=
+github.com/sashabaranov/go-openai v1.24.1/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
 github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
 go.starlark.net v0.0.0-20240123142251-f86470692795 h1:LmbG8Pq7KDGkglKVn8VpZOZj6vb9b8nKEGcg9l03epM=
 go.starlark.net v0.0.0-20240123142251-f86470692795/go.mod h1:LcLNIzVOMp4oV+uusnpk+VU+SzXaJakUuBjoCSWH5dM=

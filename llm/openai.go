@@ -2,10 +2,15 @@
 package llm
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/1set/starlet"
 	"github.com/PureMature/starport/base"
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
+
+	oai "github.com/sashabaranov/go-openai"
 )
 
 // ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('llm', 'chat')
@@ -14,6 +19,7 @@ const ModuleName = "llm"
 // Module wraps the ConfigurableModule with specific functionality for calling OpenAI models.
 type Module struct {
 	cfgMod *base.ConfigurableModule[string]
+	cli    *oai.Client
 }
 
 // NewModule creates a new instance of Module.
@@ -99,4 +105,64 @@ func (m *Module) genDrawFunc() starlark.Callable {
 		//}
 		return starlark.None, nil
 	})
+}
+
+// SetClient sets the OpenAI client for this module.
+func (m *Module) SetClient(cli *oai.Client) {
+	m.cli = cli
+}
+
+// getClient retrieves the OpenAI client for this module.
+func (m *Module) getClient(model string) (*oai.Client, error) {
+	if m.cli != nil {
+		// use the existing client
+		return m.cli, nil
+	}
+
+	provider, err := m.cfgMod.GetConfig("openai_provider")
+	if err != nil {
+		provider = "openai"
+	}
+	apiKey, err := m.cfgMod.GetConfig("openai_api_key")
+	if err != nil {
+		return nil, err
+	}
+	endpointURL, err := m.cfgMod.GetConfig("openai_endpoint_url")
+
+	// create client configuration
+	var cfg oai.ClientConfig
+	switch strings.ToLower(provider) {
+	case "azure": // Azure OpenAI services
+		if err != nil {
+			return nil, err // endpointURL is required for Azure
+		}
+		cfg = oai.DefaultAzureConfig(apiKey, endpointURL)
+		cfg.APIVersion = `2024-02-01`
+		cfg.AzureModelMapperFunc = func(_ string) string {
+			return model
+		}
+	case "openai": // Vanilla OpenAI services
+		cfg = oai.DefaultConfig(apiKey)
+	default:
+		return nil, fmt.Errorf("unsupported provider: %s", provider)
+	}
+
+	// create a new client
+	return oai.NewClientWithConfig(cfg), nil
+}
+
+// getModel retrieves the model name.
+// If modelVal is empty, it will use the modelKey to retrieve the model value from the configuration.
+func (m *Module) getModel(key, val string) string {
+	// use the provided model value
+	if val != "" {
+		return val
+	}
+	// or retrieve the model value from the configuration
+	model, err := m.cfgMod.GetConfig(key)
+	if err == nil {
+		return model
+	}
+	// return an empty string if the model is not found
+	return ""
 }

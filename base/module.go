@@ -27,6 +27,11 @@ func (m *ConfigurableModule[T]) SetConfig(name string, getter ConfigGetter[T]) {
 	m.configs[name] = getter
 }
 
+// SetConfigValue sets a configuration value for a given name.
+func (m *ConfigurableModule[T]) SetConfigValue(name string, value T) {
+	m.configs[name] = func() T { return value }
+}
+
 // genSetConfig generates a Starlark callable function to set a configuration value.
 func (m *ConfigurableModule[T]) genSetConfig(name string) starlark.Callable {
 	return starlark.NewBuiltin(name, func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {

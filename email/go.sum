@@ -10,8 +10,8 @@ github.com/1set/starlight v0.1.1/go.mod h1:UBovtihT3K/JtaX+Nv/xBmdDk3LW6kr5yzqaY
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/toml v1.1.0 h1:ksErzDEI1khOiGPgpwuI7x2ebx/uXQNw7xJpn9Eq1+I=
 github.com/BurntSushi/toml v1.1.0/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
-github.com/PureMature/starport/base v0.0.2 h1:I4UGeauh/IR5KvmS5ZTj0GoR4m94+X7a7r5Jx/5sin0=
-github.com/PureMature/starport/base v0.0.2/go.mod h1:aBAn3DO+PLrIS5yCBHP6QcBRu6llNx6GgsRP2UXmKVc=
+github.com/PureMature/starport/base v0.0.3 h1:SSDtnMpzGthXRaOiODXsYF6lARKcWk2GaqFn16Fk5/w=
+github.com/PureMature/starport/base v0.0.3/go.mod h1:aBAn3DO+PLrIS5yCBHP6QcBRu6llNx6GgsRP2UXmKVc=
 github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLju8=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=

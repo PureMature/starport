@@ -6,7 +6,7 @@ require (
 	bitbucket.org/neiku/hlog v0.1.2
 	github.com/1set/gut v0.0.0-20201117175203-a82363231997
 	github.com/1set/starlet v0.1.2-0.20240528100323-c91e367021b8
-	github.com/PureMature/starport/base v0.0.2
+	github.com/PureMature/starport/base v0.0.3
 	github.com/resend/resend-go/v2 v2.6.0
 	github.com/samber/lo v1.39.0
 	github.com/yuin/goldmark v1.7.1

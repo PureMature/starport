@@ -37,8 +37,6 @@ func NewModule() *Module {
 // NewModuleWithConfig creates a new instance of Module with the given configuration values.
 func NewModuleWithConfig(resendAPIKey, senderDomain string) *Module {
 	cm := base.NewConfigurableModule[string]()
-	// cm.SetConfig("resend_api_key", func() string { return resendAPIKey })
-	// cm.SetConfig("sender_domain", func() string { return senderDomain })
 	cm.SetConfigValue("resend_api_key", resendAPIKey)
 	cm.SetConfigValue("sender_domain", senderDomain)
 	return &Module{cfgMod: cm}

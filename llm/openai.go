@@ -88,7 +88,7 @@ func (m *Module) genChatFunc() starlark.Callable {
 			textMsg   types.NullableStringOrBytes
 			userModel types.NullableStringOrBytes
 		)
-		if err := starlark.UnpackArgs(b.Name(), args, kwargs, "text?", textMsg, "model?", &userModel); err != nil {
+		if err := starlark.UnpackArgs(b.Name(), args, kwargs, "text?", &textMsg, "model?", &userModel); err != nil {
 			return none, err
 		}
 

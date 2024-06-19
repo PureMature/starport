@@ -5,13 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv/types"
 	"github.com/PureMature/starport/base"
 	oai "github.com/sashabaranov/go-openai"
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
-	"strings"
 )
 
 // ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('llm', 'chat')
@@ -85,10 +86,27 @@ func newMessageStruct(thread *starlark.Thread, b *starlark.Builtin, args starlar
 func (m *Module) genChatFunc() starlark.Callable {
 	return starlark.NewBuiltin(ModuleName+".chat", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 		var (
-			textMsg   types.NullableStringOrBytes
-			userModel types.NullableStringOrBytes
+			// message
+			msgText       types.NullableStringOrBytes
+			msgImageBytes types.NullableStringOrBytes
+			msgImageFile  types.NullableStringOrBytes
+			msgImageURL   types.NullableStringOrBytes
+			messages      = types.NewOneOrManyNoDefault[*starlark.Dict]()
+			// model request
+			userModel        types.NullableStringOrBytes
+			numOfChoices     = 1
+			maxTokens        = 64
+			temperature      = types.FloatOrInt(1.0)
+			topP             = types.FloatOrInt(1.0)
+			frequencyPenalty = types.FloatOrInt(0.0)
+			presencePenalty  = types.FloatOrInt(0.0)
+			stopSequences    = types.NewOneOrManyNoDefault[starlark.String]()
+			responseFormat   = types.NewNullableStringOrBytes("text")
+			// call
+			retryTimes   = 1
+			fullResponse = false
 		)
-		if err := starlark.UnpackArgs(b.Name(), args, kwargs, "text?", &textMsg, "model?", &userModel); err != nil {
+		if err := starlark.UnpackArgs(b.Name(), args, kwargs, "text?", &msgText, "model?", &userModel); err != nil {
 			return none, err
 		}
 
@@ -107,7 +125,7 @@ func (m *Module) genChatFunc() starlark.Callable {
 		// call OpenAI API
 		msg := oai.ChatCompletionMessage{
 			Role:    oai.ChatMessageRoleUser,
-			Content: textMsg.GoString(),
+			Content: msgText.GoString(),
 		}
 		resp, err := cli.CreateChatCompletion(
 			context.Background(), // TODO: for context cancel
@@ -137,6 +155,9 @@ func (m *Module) genChatFunc() starlark.Callable {
 			oai.ChatCompletionRequest{
 				Model:    model,
 				Messages: []oai.ChatCompletionMessage{msg},
+				ResponseFormat: &oai.ChatCompletionResponseFormat{
+					Type: oai.ChatCompletionResponseFormatTypeJSONObject,
+				},
 			},
 		)
 		if err != nil {

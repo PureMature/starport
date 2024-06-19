@@ -65,7 +65,8 @@ func (m *Module) LoadModule() starlet.ModuleLoader {
 }
 
 var (
-	none = starlark.None
+	none     = starlark.None
+	emptyStr string
 )
 
 func newMessageStruct(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -105,10 +106,52 @@ func (m *Module) genChatFunc() starlark.Callable {
 			// call
 			retryTimes   = 1
 			fullResponse = false
+			allowError   = false
 		)
-		if err := starlark.UnpackArgs(b.Name(), args, kwargs, "text?", &msgText, "model?", &userModel); err != nil {
+		if err := starlark.UnpackArgs(b.Name(), args, kwargs,
+			"text?", &msgText, "image?", &msgImageBytes, "image_file?", &msgImageFile, "image_url?", &msgImageURL, "messages?", messages,
+			"model?", &userModel, "n?", &numOfChoices, "max_tokens?", &maxTokens, "temperature?", &temperature, "top_p?", &topP, "frequency_penalty?", &frequencyPenalty, "presence_penalty?", &presencePenalty, "stop?", stopSequences, "response_format?", responseFormat,
+			"retry?", &retryTimes, "full_response?", &fullResponse, "allow_error?", &allowError,
+		); err != nil {
 			return none, err
 		}
+
+		// define the function behavior
+		fmt.Println("text:", msgText.GoString())
+		fmt.Println("image:", msgImageBytes.GoString())
+		fmt.Println("image_file:", msgImageFile.GoString())
+		fmt.Println("image_url:", msgImageURL.GoString())
+		fmt.Println("messages:", messages)
+		fmt.Println("model:", userModel.GoString())
+		fmt.Println("n:", numOfChoices)
+		fmt.Println("max_tokens:", maxTokens)
+		fmt.Println("temperature:", temperature)
+		fmt.Println("top_p:", topP)
+		fmt.Println("frequency_penalty:", frequencyPenalty)
+		fmt.Println("presence_penalty:", presencePenalty)
+		fmt.Println("stop:", stopSequences)
+		fmt.Println("response_format:", responseFormat.GoString())
+		fmt.Println("retry:", retryTimes)
+		fmt.Println("full_response:", fullResponse)
+		fmt.Println("allow_error:", allowError)
+
+		return none, nil
+
+		/*
+
+		   nm = chat(
+		       model="GPT-4o", # or from the config
+		       messages=msg, # or [msg, msg2, msg3]
+		       max_tokens=64,
+		       temperature=1.0,    # int or float [0,2]
+		       top_p=1.0,          # int or float [0,1]
+		       frequency_penalty=0.0,  # int or float [-2,2]
+		       presence_penalty=0.0,   # int or float [-2,2]
+		       stop=["\n", "User:"],   # string or list of strings
+		       user="User",    # track the user
+		   )
+
+		*/
 
 		// get model
 		model := m.getModel("openai_gpt_model", userModel.GoString())

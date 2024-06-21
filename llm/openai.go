@@ -12,7 +12,6 @@ import (
 	"github.com/PureMature/starport/base"
 	oai "github.com/sashabaranov/go-openai"
 	"go.starlark.net/starlark"
-	"go.starlark.net/starlarkstruct"
 )
 
 // ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('llm', 'chat')
@@ -72,16 +71,37 @@ var (
 func newMessageStruct(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	// Parse arguments
 	var (
-		message starlark.String
+		role          = types.NewNullableStringOrBytes(oai.ChatMessageRoleUser)
+		msgText       = types.NewNullableStringOrBytesNoDefault()
+		msgImageBytes = types.NewNullableStringOrBytesNoDefault()
+		msgImageFile  = types.NewNullableStringOrBytesNoDefault()
+		msgImageURL   = types.NewNullableStringOrBytesNoDefault()
 	)
-	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "message", &message); err != nil {
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "role?", role,
+		"text?", msgText, "image?", msgImageBytes, "image_file?", msgImageFile, "image_url?", msgImageURL,
+	); err != nil {
 		return none, err
 	}
 
-	// Create a new message struct
-	return starlarkstruct.FromStringDict(starlark.String("Message"), starlark.StringDict{
-		"message": message,
-	}), nil
+	// Create a new message
+	md := starlark.NewDict(2)
+
+	// Add key values
+	prepared := map[string]*types.NullableStringOrBytes{
+		"role":       role,
+		"text":       msgText,
+		"image":      msgImageBytes,
+		"image_file": msgImageFile,
+		"image_url":  msgImageURL,
+	}
+	for key, val := range prepared {
+		if !val.IsNullOrEmpty() {
+			// md.SetKey(starlark.String(key), starlark.String(val.GoString())) // TODO: use .StarlarkString()
+			md.SetKey(starlark.String(key), val.StarlarkString())
+		}
+	}
+
+	return md, nil
 }
 
 func (m *Module) genChatFunc() starlark.Callable {
@@ -116,12 +136,31 @@ func (m *Module) genChatFunc() starlark.Callable {
 			return none, err
 		}
 
+		// history messages, prepend user message if defined
+		allMsgs := messages.Slice()
+		usrMd := starlark.NewDict(1)
+		prepared := map[string]*types.NullableStringOrBytes{
+			"text":       msgText,
+			"image":      msgImageBytes,
+			"image_file": msgImageFile,
+			"image_url":  msgImageURL,
+		}
+		for key, val := range prepared {
+			if !val.IsNullOrEmpty() {
+				usrMd.SetKey(starlark.String(key), val.StarlarkString())
+			}
+		}
+		if usrMd.Len() > 0 {
+			usrMd.SetKey(starlark.String("role"), starlark.String(oai.ChatMessageRoleUser))
+			allMsgs = append([]*starlark.Dict{usrMd}, allMsgs...)
+		}
+
 		// define the function behavior
-		fmt.Println("text:", msgText.GoString())
+		fmt.Println("😄 text:", msgText.GoString())
 		fmt.Println("image:", msgImageBytes.GoString())
 		fmt.Println("image_file:", msgImageFile.GoString())
 		fmt.Println("image_url:", msgImageURL.GoString())
-		fmt.Println("messages:", messages)
+		fmt.Println("messages:", allMsgs)
 		fmt.Println("model:", userModel.GoString())
 		fmt.Println("n:", numOfChoices)
 		fmt.Println("max_tokens:", maxTokens)
@@ -134,6 +173,8 @@ func (m *Module) genChatFunc() starlark.Callable {
 		fmt.Println("retry:", retryTimes)
 		fmt.Println("full_response:", fullResponse)
 		fmt.Println("allow_error:", allowError)
+
+		stopSequences.Slice()
 
 		return none, nil
 

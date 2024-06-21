@@ -1,5 +1,7 @@
 github.com/1set/starlet v0.1.2-0.20240528100323-c91e367021b8 h1:U2PR2+cPXcsjmLVKkDcSmQAHGkHFAkEKi9hTOCJGlAU=
 github.com/1set/starlet v0.1.2-0.20240528100323-c91e367021b8/go.mod h1:CUUuoFBHm0vdj5YJsWHJUHhiV79jjn4V4PZ2gQtY2o8=
+github.com/1set/starlet v0.1.2-0.20240620132352-4ef73d8cb28e h1:LBAYgfBvQxHnnrWs+uXMFok828KCPV/ZDzvr96Q6nGU=
+github.com/1set/starlet v0.1.2-0.20240620132352-4ef73d8cb28e/go.mod h1:CUUuoFBHm0vdj5YJsWHJUHhiV79jjn4V4PZ2gQtY2o8=
 github.com/1set/starlight v0.1.1 h1:U9qKgq3TvmyWDVx4KmGEAOIoTDAxxG+txzzDAAMYLEA=
 github.com/1set/starlight v0.1.1/go.mod h1:UBovtihT3K/JtaX+Nv/xBmdDk3LW6kr5yzqaYFo4KDQ=
 github.com/PureMature/starport/base v0.0.3 h1:SSDtnMpzGthXRaOiODXsYF6lARKcWk2GaqFn16Fk5/w=

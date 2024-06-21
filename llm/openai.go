@@ -88,13 +88,13 @@ func (m *Module) genChatFunc() starlark.Callable {
 	return starlark.NewBuiltin(ModuleName+".chat", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 		var (
 			// message
-			msgText       types.NullableStringOrBytes
-			msgImageBytes types.NullableStringOrBytes
-			msgImageFile  types.NullableStringOrBytes
-			msgImageURL   types.NullableStringOrBytes
+			msgText       = types.NewNullableStringOrBytesNoDefault()
+			msgImageBytes = types.NewNullableStringOrBytesNoDefault()
+			msgImageFile  = types.NewNullableStringOrBytesNoDefault()
+			msgImageURL   = types.NewNullableStringOrBytesNoDefault()
 			messages      = types.NewOneOrManyNoDefault[*starlark.Dict]()
 			// model request
-			userModel        types.NullableStringOrBytes
+			userModel        = types.NewNullableStringOrBytesNoDefault()
 			numOfChoices     = 1
 			maxTokens        = 64
 			temperature      = types.FloatOrInt(1.0)
@@ -109,8 +109,8 @@ func (m *Module) genChatFunc() starlark.Callable {
 			allowError   = false
 		)
 		if err := starlark.UnpackArgs(b.Name(), args, kwargs,
-			"text?", &msgText, "image?", &msgImageBytes, "image_file?", &msgImageFile, "image_url?", &msgImageURL, "messages?", messages,
-			"model?", &userModel, "n?", &numOfChoices, "max_tokens?", &maxTokens, "temperature?", &temperature, "top_p?", &topP, "frequency_penalty?", &frequencyPenalty, "presence_penalty?", &presencePenalty, "stop?", stopSequences, "response_format?", responseFormat,
+			"text?", msgText, "image?", msgImageBytes, "image_file?", msgImageFile, "image_url?", msgImageURL, "messages?", messages,
+			"model?", userModel, "n?", &numOfChoices, "max_tokens?", &maxTokens, "temperature?", &temperature, "top_p?", &topP, "frequency_penalty?", &frequencyPenalty, "presence_penalty?", &presencePenalty, "stop?", stopSequences, "response_format?", responseFormat,
 			"retry?", &retryTimes, "full_response?", &fullResponse, "allow_error?", &allowError,
 		); err != nil {
 			return none, err

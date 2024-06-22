@@ -155,6 +155,16 @@ func (m *Module) genChatFunc() starlark.Callable {
 			allMsgs = append([]*starlark.Dict{usrMd}, allMsgs...)
 		}
 
+		// TODO: convert list of history messages to OpenAI format struct
+
+		// Get the client
+
+		// Send the request to OpenAI with Retry
+
+		// Return the response or error
+
+		// For response, extract of data or full response
+
 		// define the function behavior
 		fmt.Println("😄 text:", msgText.GoString())
 		fmt.Println("image:", msgImageBytes.GoString())

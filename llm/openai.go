@@ -56,9 +56,9 @@ func NewModuleWithGetter(serviceProvider, endpointURL, apiKey, gptModel, dalleMo
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"new_message": starlark.NewBuiltin("new_message", newMessageStruct),
-		"chat":        m.genChatFunc(),
-		"draw":        m.genDrawFunc(),
+		"message": starlark.NewBuiltin("message", newMessageStruct),
+		"chat":    m.genChatFunc(),
+		"draw":    m.genDrawFunc(),
 	}
 	return m.cfgMod.LoadModule(ModuleName, additionalFuncs)
 }
@@ -157,6 +157,12 @@ func (m *Module) genChatFunc() starlark.Callable {
 
 		// TODO: convert list of history messages to OpenAI format struct
 
+		// convert messages to OpenAI format
+		chatMessages, err := messagesToChatMessages(allMsgs)
+		if err != nil {
+			return none, err
+		}
+
 		// Get the client
 
 		// Send the request to OpenAI with Retry
@@ -217,10 +223,10 @@ func (m *Module) genChatFunc() starlark.Callable {
 		}
 
 		// call OpenAI API
-		msg := oai.ChatCompletionMessage{
-			Role:    oai.ChatMessageRoleUser,
-			Content: msgText.GoString(),
-		}
+		//msg := oai.ChatCompletionMessage{
+		//	Role:    oai.ChatMessageRoleUser,
+		//	Content: msgText.GoString(),
+		//}
 		resp, err := cli.CreateChatCompletion(
 			context.Background(), // TODO: for context cancel
 			//oai.ChatCompletionRequest{
@@ -248,7 +254,7 @@ func (m *Module) genChatFunc() starlark.Callable {
 			//},
 			oai.ChatCompletionRequest{
 				Model:    model,
-				Messages: []oai.ChatCompletionMessage{msg},
+				Messages: chatMessages,
 				ResponseFormat: &oai.ChatCompletionResponseFormat{
 					Type: oai.ChatCompletionResponseFormatTypeJSONObject,
 				},
@@ -346,4 +352,10 @@ func (m *Module) getModel(key, val string) string {
 	}
 	// return an empty string if the model is not found
 	return ""
+}
+
+func messagesToChatMessages(msgs []*starlark.Dict) ([]oai.ChatCompletionMessage, error) {
+
+	// TODO
+	return nil, nil
 }

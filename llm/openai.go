@@ -14,6 +14,7 @@ import (
 
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv/types"
+	"github.com/1set/starlight/convert"
 	"github.com/PureMature/starport/base"
 	oai "github.com/sashabaranov/go-openai"
 	"go.starlark.net/starlark"
@@ -141,6 +142,12 @@ func (m *Module) genChatFunc() starlark.Callable {
 			return none, err
 		}
 
+		// get model
+		model := m.getModel("openai_gpt_model", userModel.GoString())
+		if model == "" {
+			return none, errors.New("gpt model is not set")
+		}
+
 		// history messages, prepend user message if defined
 		allMsgs := messages.Slice()
 		usrMd := starlark.NewDict(1)
@@ -160,65 +167,36 @@ func (m *Module) genChatFunc() starlark.Callable {
 			allMsgs = append([]*starlark.Dict{usrMd}, allMsgs...)
 		}
 
-		// TODO: convert list of history messages to OpenAI format struct
-
-		// convert messages to OpenAI format
+		// convert to OpenAI chat messages
 		chatMessages, err := messagesToChatMessages(allMsgs)
 		if err != nil {
 			return none, err
 		}
-
-		// Get the client
-
-		// Send the request to OpenAI with Retry
-
-		// Return the response or error
-
-		// For response, extract of data or full response
-
-		// define the function behavior
-		fmt.Println("😄 text:", msgText.GoString())
-		fmt.Println("image:", msgImageBytes.GoString())
-		fmt.Println("image_file:", msgImageFile.GoString())
-		fmt.Println("image_url:", msgImageURL.GoString())
-		fmt.Println("messages:", allMsgs)
-		fmt.Println("model:", userModel.GoString())
-		fmt.Println("n:", numOfChoices)
-		fmt.Println("max_tokens:", maxTokens)
-		fmt.Println("temperature:", temperature)
-		fmt.Println("top_p:", topP)
-		fmt.Println("frequency_penalty:", frequencyPenalty)
-		fmt.Println("presence_penalty:", presencePenalty)
-		fmt.Println("stop:", stopSequences)
-		fmt.Println("response_format:", responseFormat.GoString())
-		fmt.Println("retry:", retryTimes)
-		fmt.Println("full_response:", fullResponse)
-		fmt.Println("allow_error:", allowError)
-
-		stopSequences.Slice()
-
-		return none, nil
-
-		/*
-
-		   nm = chat(
-		       model="GPT-4o", # or from the config
-		       messages=msg, # or [msg, msg2, msg3]
-		       max_tokens=64,
-		       temperature=1.0,    # int or float [0,2]
-		       top_p=1.0,          # int or float [0,1]
-		       frequency_penalty=0.0,  # int or float [-2,2]
-		       presence_penalty=0.0,   # int or float [-2,2]
-		       stop=["\n", "User:"],   # string or list of strings
-		       user="User",    # track the user
-		   )
-
-		*/
-
-		// get model
-		model := m.getModel("openai_gpt_model", userModel.GoString())
-		if model == "" {
-			return none, errors.New("gpt model is not set")
+		var stopWords []string
+		for _, s := range stopSequences.Slice() {
+			stopWords = append(stopWords, s.GoString())
+		}
+		req := oai.ChatCompletionRequest{
+			Model:            model,
+			Messages:         chatMessages,
+			MaxTokens:        maxTokens,
+			Temperature:      temperature.GoFloat32(),
+			TopP:             topP.GoFloat32(),
+			N:                numOfChoices,
+			Stop:             stopWords,
+			PresencePenalty:  presencePenalty.GoFloat32(),
+			FrequencyPenalty: frequencyPenalty.GoFloat32(),
+		}
+		if rf := responseFormat.GoString(); rf == "json" {
+			req.ResponseFormat = &oai.ChatCompletionResponseFormat{
+				Type: oai.ChatCompletionResponseFormatTypeJSONObject,
+			}
+		} else if rf == "text" {
+			req.ResponseFormat = &oai.ChatCompletionResponseFormat{
+				Type: oai.ChatCompletionResponseFormatTypeText,
+			}
+		} else {
+			return none, fmt.Errorf("unsupported response format: %s", rf)
 		}
 
 		// get client
@@ -227,60 +205,34 @@ func (m *Module) genChatFunc() starlark.Callable {
 			return nil, err
 		}
 
-		// call OpenAI API
-		//msg := oai.ChatCompletionMessage{
-		//	Role:    oai.ChatMessageRoleUser,
-		//	Content: msgText.GoString(),
-		//}
-		resp, err := cli.CreateChatCompletion(
-			context.Background(), // TODO: for context cancel
-			//oai.ChatCompletionRequest{
-			//	Model:            "",
-			//	Messages:         nil,
-			//	MaxTokens:        0,
-			//	Temperature:      0,
-			//	TopP:             0,
-			//	N:                0,
-			//	Stream:           false,
-			//	Stop:             nil,
-			//	PresencePenalty:  0,
-			//	ResponseFormat:   nil,
-			//	Seed:             nil,
-			//	FrequencyPenalty: 0,
-			//	LogitBias:        nil,
-			//	LogProbs:         false,
-			//	TopLogProbs:      0,
-			//	User:             "",
-			//	Functions:        nil,
-			//	FunctionCall:     nil,
-			//	Tools:            nil,
-			//	ToolChoice:       nil,
-			//	StreamOptions:    nil,
-			//},
-			oai.ChatCompletionRequest{
-				Model:    model,
-				Messages: chatMessages,
-				ResponseFormat: &oai.ChatCompletionResponseFormat{
-					Type: oai.ChatCompletionResponseFormatTypeJSONObject,
-				},
-			},
-		)
+		// send request to provider
+		// TODO: for context cancel
+		resp, err := cli.CreateChatCompletion(context.Background(), req)
+
+		// handle error: if allowError is set, return None, otherwise return the error
 		if err != nil {
+			if allowError {
+				return none, nil
+			}
 			return none, err
 		}
-		fmt.Println("Result:", resp)
-		return starlark.String(resp.Choices[0].Message.Content), nil
 
-		//// Load config
-		//provider, err := m.cfgMod.GetConfig("openai_provider")
-		//if err != nil {
-		//	return starlark.None, err
-		//}
-		//endpointURL, err := m.cfgMod.GetConfig("openai_endpoint_url")
-		//if err != nil {
-		//	return starlark.None, err
-		//}
-		//return none, nil
+		// return the response: if fullResponse is set, return the full response, otherwise return the content
+		if fullResponse {
+			return convert.NewStructWithTag(&resp, "json"), nil
+		}
+		if len(resp.Choices) == 0 {
+			return none, nil
+		}
+		// if numOfChoices is 1, return the content string, otherwise return a list of contents
+		if numOfChoices == 1 {
+			return starlark.String(resp.Choices[0].Message.Content), nil
+		}
+		var res []starlark.Value
+		for _, ch := range resp.Choices {
+			res = append(res, starlark.String(ch.Message.Content))
+		}
+		return starlark.NewList(res), nil
 	})
 }
 

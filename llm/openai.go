@@ -3,8 +3,13 @@ package llm
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"mime"
+	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/1set/starlet"
@@ -354,8 +359,132 @@ func (m *Module) getModel(key, val string) string {
 	return ""
 }
 
-func messagesToChatMessages(msgs []*starlark.Dict) ([]oai.ChatCompletionMessage, error) {
+// getStringFromDict retrieves a string value from a dictionary and whether the key exists
+func getStringFromDict(d *starlark.Dict, key string) (string, bool) {
+	v, ok, err := d.Get(starlark.String(key))
+	// if the key is not found, or the value is nil, or there is an error, return an empty string
+	if err != nil || !ok || v == nil {
+		return emptyStr, false
+	}
+	// if the value is a string, return the string
+	if s, ok := v.(starlark.String); ok {
+		return string(s), true
+	} else if b, ok := v.(starlark.Bytes); ok {
+		return string(b), true
+	}
+	// otherwise, return an empty string
+	return emptyStr, false
+}
 
-	// TODO
-	return nil, nil
+// Function to read file and convert it to base64 data
+func imageFileToBase64(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+
+	fileSize := fileInfo.Size()
+	fileBuffer := make([]byte, fileSize)
+
+	bytesRead, err := file.Read(fileBuffer)
+	if err != nil {
+		return "", err
+	}
+	if bytesRead != int(fileSize) {
+		return "", fmt.Errorf("expected to read %d bytes but read %d", fileSize, bytesRead)
+	}
+
+	base64Data := base64.StdEncoding.EncodeToString(fileBuffer)
+	mimeType := mime.TypeByExtension(filepath.Ext(filePath))
+	return fmt.Sprintf("data:%s;base64,%s", mimeType, base64Data), nil
+}
+
+func imageDataToBase64(data []byte) string {
+	base64Data := base64.StdEncoding.EncodeToString(data)
+	mimeType := http.DetectContentType(data)
+	return fmt.Sprintf("data:%s;base64,%s", mimeType, base64Data)
+}
+
+func messagesToChatMessages(msgs []*starlark.Dict) ([]oai.ChatCompletionMessage, error) {
+	var res []oai.ChatCompletionMessage
+	for i, md := range msgs {
+		msg := oai.ChatCompletionMessage{}
+		role, ok := getStringFromDict(md, "role")
+		if !ok {
+			return nil, fmt.Errorf("message %d: role is required", i+1)
+		}
+		msg.Role = role
+
+		// get the content
+		text, okT := getStringFromDict(md, "text")
+		imageBytes, okI := getStringFromDict(md, "image")
+		imageFile, okF := getStringFromDict(md, "image_file")
+		imageURL, okU := getStringFromDict(md, "image_url")
+		okImg := okI || okF || okU
+
+		// if all are empty, return an error
+		if !(okT || okImg) {
+			return nil, fmt.Errorf("message %d: at least one of text, image, image_file, or image_url is required", i+1)
+		}
+
+		// check if text and image are both set
+		if okT && !okImg {
+			// only text is set, treat as one text message
+			msg.Content = text
+			res = append(res, msg)
+			continue
+		}
+
+		// build the message parts
+		var mcp []oai.ChatMessagePart
+		if okT { // for text part
+			mcp = append(mcp, oai.ChatMessagePart{
+				Type: oai.ChatMessagePartTypeText,
+				Text: text,
+			})
+		}
+		if okU { // for image URL part
+			mcp = append(mcp, oai.ChatMessagePart{
+				Type: oai.ChatMessagePartTypeImageURL,
+				ImageURL: &oai.ChatMessageImageURL{
+					URL:    imageURL,
+					Detail: oai.ImageURLDetailAuto,
+				},
+			})
+		}
+		if okI { // for image content part, convert to mime & base64
+			b64 := imageDataToBase64([]byte(imageBytes))
+			mcp = append(mcp, oai.ChatMessagePart{
+				Type: oai.ChatMessagePartTypeImageURL,
+				ImageURL: &oai.ChatMessageImageURL{
+					URL:    b64,
+					Detail: oai.ImageURLDetailAuto,
+				},
+			})
+		}
+		if okF { // for image file part, read and convert to mime & base64
+			b64, err := imageFileToBase64(imageFile)
+			if err != nil {
+				return nil, fmt.Errorf("message %d: %w", i+1, err)
+			}
+			mcp = append(mcp, oai.ChatMessagePart{
+				Type: oai.ChatMessagePartTypeImageURL,
+				ImageURL: &oai.ChatMessageImageURL{
+					URL:    b64,
+					Detail: oai.ImageURLDetailAuto,
+				},
+			})
+		}
+
+		// set the message parts back to the message
+		msg.MultiContent = mcp
+		res = append(res, msg)
+	}
+	return res, nil
 }

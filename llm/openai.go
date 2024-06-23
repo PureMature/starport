@@ -206,8 +206,22 @@ func (m *Module) genChatFunc() starlark.Callable {
 		}
 
 		// send request to provider
-		// TODO: for context cancel
-		resp, err := cli.CreateChatCompletion(context.Background(), req)
+		// TODO: for context cancel, for retry
+		var resp oai.ChatCompletionResponse
+		for i := 0; i < retryTimes; i++ {
+			resp, err = cli.CreateChatCompletion(context.Background(), req)
+			// if no error, break the loop, got the response
+			if err == nil {
+				break
+			}
+			// if the error is a bad request, break the loop, no need to retry
+			var ae *oai.APIError
+			if errors.As(err, &ae) && ae != nil {
+				if ae.HTTPStatusCode == http.StatusBadRequest {
+					break
+				}
+			}
+		}
 
 		// handle error: if allowError is set, return None, otherwise return the error
 		if err != nil {

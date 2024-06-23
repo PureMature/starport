@@ -2,10 +2,12 @@
 package llm
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"image/png"
 	"mime"
 	"net/http"
 	"os"
@@ -108,6 +110,133 @@ func newMessageStruct(thread *starlark.Thread, b *starlark.Builtin, args starlar
 	}
 
 	return md, nil
+}
+
+func (m *Module) genDrawFunc() starlark.Callable {
+	return starlark.NewBuiltin(ModuleName+".draw", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		//// Load config
+		//provider, err := m.cfgMod.GetConfig("openai_provider")
+		//if err != nil {
+		//	return starlark.None, err
+		//}
+		//endpointURL, err := m.cfgMod.GetConfig("openai_endpoint_url")
+		//if err != nil {
+		//	return starlark.None, err
+		//}
+		var (
+			prompt = types.NewNullableStringOrBytesNoDefault()
+			// model request
+			userModel      = types.NewNullableStringOrBytesNoDefault()
+			numOfChoices   = 1
+			quality        = types.NewNullableStringOrBytes("standard")
+			size           = types.NewNullableStringOrBytes("1024x1024")
+			style          = types.NewNullableStringOrBytes("vivid")
+			responseFormat = types.NewNullableStringOrBytes("url")
+			// call
+			retryTimes   = 1
+			fullResponse = false
+			allowError   = false
+		)
+		if err := starlark.UnpackArgs(b.Name(), args, kwargs,
+			"prompt", prompt, "model?", userModel, "n?", &numOfChoices, "quality?", quality, "size?", size, "style?", style, "response_format?", responseFormat,
+			"retry?", &retryTimes, "full_response?", &fullResponse, "allow_error?", &allowError,
+		); err != nil {
+			return none, err
+		}
+
+		// get prompt
+		if prompt.IsNullOrEmpty() {
+			return none, errors.New("prompt is required")
+		}
+
+		// get model
+		model := m.getModel("openai_dalle_model", userModel.GoString())
+		if model == "" {
+			return none, errors.New("dalle model is not set")
+		}
+
+		// build request
+		req := oai.ImageRequest{
+			Prompt:         prompt.GoString(),
+			Model:          model,
+			N:              numOfChoices,
+			Quality:        quality.GoString(),
+			Size:           size.GoString(),
+			Style:          style.GoString(),
+			ResponseFormat: responseFormat.GoString(),
+		}
+
+		// get client
+		cli, err := m.getClient(model)
+		if err != nil {
+			return nil, err
+		}
+
+		// send request to provider
+		// TODO: for context cancel, for retry
+		var resp oai.ImageResponse
+		for i := 0; i < retryTimes; i++ {
+			resp, err = cli.CreateImage(context.Background(), req)
+			// if no error, break the loop, got the response
+			if err == nil {
+				break
+			}
+			// if the error is a bad request, break the loop, no need to retry
+			var ae *oai.APIError
+			if errors.As(err, &ae) && ae != nil {
+				if ae.HTTPStatusCode == http.StatusBadRequest {
+					break
+				}
+			}
+		}
+
+		// handle error: if allowError is set, return None, otherwise return the error
+		if err != nil {
+			if allowError {
+				return none, nil
+			}
+			return none, err
+		}
+
+		// return the response: if fullResponse is set, return the full response, otherwise return the content
+		if fullResponse {
+			return convert.NewStructWithTag(&resp, "json"), nil
+		}
+
+		// if numOfChoices is 1, return the content string, otherwise return a list of contents
+		isURL := strings.ToLower(responseFormat.GoString()) == "url"
+		extractImage := func(di oai.ImageResponseDataInner) (starlark.Value, error) {
+			if isURL {
+				return starlark.String(di.URL), nil
+			}
+			ib, err := base64.StdEncoding.DecodeString(di.B64JSON)
+			if err != nil {
+				return none, err
+			}
+			r := bytes.NewReader(ib)
+			img, err := png.Decode(r)
+			if err != nil {
+				return none, err
+			}
+			bf := new(bytes.Buffer)
+			if err := png.Encode(bf, img); err != nil {
+				return none, err
+			}
+			return starlark.Bytes(bf.String()), nil
+		}
+		if numOfChoices == 1 {
+			return extractImage(resp.Data[0])
+		}
+		var res []starlark.Value
+		for _, di := range resp.Data {
+			img, err := extractImage(di)
+			if err != nil {
+				return none, err
+			}
+			res = append(res, img)
+		}
+		return starlark.NewList(res), nil
+	})
 }
 
 func (m *Module) genChatFunc() starlark.Callable {
@@ -247,21 +376,6 @@ func (m *Module) genChatFunc() starlark.Callable {
 			res = append(res, starlark.String(ch.Message.Content))
 		}
 		return starlark.NewList(res), nil
-	})
-}
-
-func (m *Module) genDrawFunc() starlark.Callable {
-	return starlark.NewBuiltin(ModuleName+".draw", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		//// Load config
-		//provider, err := m.cfgMod.GetConfig("openai_provider")
-		//if err != nil {
-		//	return starlark.None, err
-		//}
-		//endpointURL, err := m.cfgMod.GetConfig("openai_endpoint_url")
-		//if err != nil {
-		//	return starlark.None, err
-		//}
-		return none, nil
 	})
 }
 

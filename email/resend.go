@@ -208,8 +208,9 @@ func (m *Module) genSendFunc() starlark.Callable {
 		}
 
 		// send it
+		ctx := dataconv.GetThreadContext(thread)
 		client := resend.NewClient(resendAPIKey)
-		sent, err := client.Emails.Send(req)
+		sent, err := client.Emails.SendWithContext(ctx, req)
 		if err != nil {
 			return starlark.None, err
 		}

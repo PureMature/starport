@@ -104,7 +104,6 @@ func newMessageStruct(thread *starlark.Thread, b *starlark.Builtin, args starlar
 	}
 	for key, val := range prepared {
 		if !val.IsNullOrEmpty() {
-			// md.SetKey(starlark.String(key), starlark.String(val.GoString())) // TODO: use .StarlarkString()
 			md.SetKey(starlark.String(key), val.StarlarkString())
 		}
 	}

@@ -3,7 +3,7 @@ module github.com/PureMature/starport/base
 go 1.18
 
 require (
-	github.com/1set/starlet v0.1.2-0.20240528100323-c91e367021b8
+	github.com/1set/starlet v0.1.2-0.20240625041505-6d190fac7b11
 	go.starlark.net v0.0.0-20240123142251-f86470692795
 )
 

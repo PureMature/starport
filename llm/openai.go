@@ -113,15 +113,6 @@ func newMessageStruct(thread *starlark.Thread, b *starlark.Builtin, args starlar
 
 func (m *Module) genDrawFunc() starlark.Callable {
 	return starlark.NewBuiltin(ModuleName+".draw", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		//// Load config
-		//provider, err := m.cfgMod.GetConfig("openai_provider")
-		//if err != nil {
-		//	return starlark.None, err
-		//}
-		//endpointURL, err := m.cfgMod.GetConfig("openai_endpoint_url")
-		//if err != nil {
-		//	return starlark.None, err
-		//}
 		var (
 			prompt = types.NewNullableStringOrBytesNoDefault()
 			// model request
@@ -455,7 +446,7 @@ func getStringFromDict(d *starlark.Dict, key string) (string, bool) {
 	return emptyStr, false
 }
 
-// Function to read file and convert it to base64 data
+// imageFileToBase64 reads file and convert it to base64 data.
 func imageFileToBase64(filePath string) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -484,12 +475,14 @@ func imageFileToBase64(filePath string) (string, error) {
 	return fmt.Sprintf("data:%s;base64,%s", mimeType, base64Data), nil
 }
 
+// imageDataToBase64 converts image data to base64 data.
 func imageDataToBase64(data []byte) string {
 	base64Data := base64.StdEncoding.EncodeToString(data)
 	mimeType := http.DetectContentType(data)
 	return fmt.Sprintf("data:%s;base64,%s", mimeType, base64Data)
 }
 
+// messagesToChatMessages converts a list of messages in starlark Dictionary to a list of OpenAI chat messages.
 func messagesToChatMessages(msgs []*starlark.Dict) ([]oai.ChatCompletionMessage, error) {
 	var res []oai.ChatCompletionMessage
 	for i, md := range msgs {

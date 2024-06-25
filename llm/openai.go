@@ -405,6 +405,9 @@ func (m *Module) getClient(model string) (*oai.Client, error) {
 		}
 	case "openai": // Vanilla OpenAI services
 		cfg = oai.DefaultConfig(apiKey)
+		if endpointURL != "" {
+			cfg.BaseURL = endpointURL
+		}
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}

@@ -3,7 +3,6 @@ package llm
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/1set/starlet"
+	"github.com/1set/starlet/dataconv"
 	"github.com/1set/starlet/dataconv/types"
 	"github.com/1set/starlight/convert"
 	"github.com/PureMature/starport/base"
@@ -173,10 +173,10 @@ func (m *Module) genDrawFunc() starlark.Callable {
 		}
 
 		// send request to provider
-		// TODO: for context cancel, for retry
+		ctx := dataconv.GetThreadContext(thread)
 		var resp oai.ImageResponse
 		for i := 0; i < retryTimes; i++ {
-			resp, err = cli.CreateImage(context.Background(), req)
+			resp, err = cli.CreateImage(ctx, req)
 			// if no error, break the loop, got the response
 			if err == nil {
 				break
@@ -335,10 +335,10 @@ func (m *Module) genChatFunc() starlark.Callable {
 		}
 
 		// send request to provider
-		// TODO: for context cancel, for retry
+		ctx := dataconv.GetThreadContext(thread)
 		var resp oai.ChatCompletionResponse
 		for i := 0; i < retryTimes; i++ {
-			resp, err = cli.CreateChatCompletion(context.Background(), req)
+			resp, err = cli.CreateChatCompletion(ctx, req)
 			// if no error, break the loop, got the response
 			if err == nil {
 				break

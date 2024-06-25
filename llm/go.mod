@@ -3,7 +3,7 @@ module github.com/PureMature/starport/llm
 go 1.18
 
 require (
-	github.com/1set/starlet v0.1.2-0.20240620132352-4ef73d8cb28e
+	github.com/1set/starlet v0.1.2-0.20240625041505-6d190fac7b11
 	github.com/PureMature/starport/base v0.0.3
 	github.com/sashabaranov/go-openai v1.24.1
 	go.starlark.net v0.0.0-20240123142251-f86470692795
@@ -18,8 +18,4 @@ require (
 	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
-)
-
-replace (
-	github.com/1set/starlet => ../../../1set/starlet
 )

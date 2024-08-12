@@ -48,13 +48,13 @@ func NewCommonModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort
 
 // ExtendModuleLoader extends the module loader with given name and additional functions.
 func (m *CommonModule) ExtendModuleLoader(name string, addons starlark.StringDict) starlet.ModuleLoader {
-	additionalFuncs := starlark.StringDict{
+	commonFuncs := starlark.StringDict{
 		"get_config": m.genGetConfig(),
 	}
 	for k, v := range addons {
-		additionalFuncs[k] = v
+		commonFuncs[k] = v
 	}
-	return m.cfgMod.LoadModule(name, additionalFuncs)
+	return m.cfgMod.LoadModule(name, commonFuncs)
 }
 
 // InitializeClient creates a new Charm API client with the given configuration values.

@@ -3,13 +3,10 @@ package cacc
 
 import (
 	"encoding/json"
-	"os"
-	"strconv"
-
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv"
 	"github.com/PureMature/starport/base"
-	"github.com/charmbracelet/charm/client"
+	"github.com/PureMature/starport/charm/core"
 	"go.starlark.net/starlark"
 )
 
@@ -18,35 +15,28 @@ const ModuleName = "cacc"
 
 // Module wraps the ConfigurableModule with specific functionality for sending emails.
 type Module struct {
-	cfgMod *base.ConfigurableModule[string]
+	*core.CommonModule
 }
 
 // NewModule creates a new instance of Module. It doesn't set any configuration values, nor provide any setters.
 func NewModule() *Module {
-	cm := base.NewConfigurableModule[string]()
-	return &Module{cfgMod: cm}
+	return &Module{
+		core.NewCommonModule(),
+	}
 }
 
 // NewModuleWithConfig creates a new instance of Module with the given configuration values.
 func NewModuleWithConfig(host, dataDirPath, keyFilePath string, sshPort, httpPort uint16) *Module {
-	cm := base.NewConfigurableModule[string]()
-	cm.SetConfigValue("host", host)
-	cm.SetConfigValue("data_dir", dataDirPath)
-	cm.SetConfigValue("key_file", keyFilePath)
-	cm.SetConfigValue("ssh_port", strconv.Itoa(int(sshPort)))
-	cm.SetConfigValue("http_port", strconv.Itoa(int(httpPort)))
-	return &Module{cfgMod: cm}
+	return &Module{
+		core.NewCommonModuleWithConfig(host, dataDirPath, keyFilePath, sshPort, httpPort),
+	}
 }
 
 // NewModuleWithGetter creates a new instance of Module with the given configuration getters.
 func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.ConfigGetter[string]) *Module {
-	cm := base.NewConfigurableModule[string]()
-	cm.SetConfig("host", host)
-	cm.SetConfig("data_dir", dataDirPath)
-	cm.SetConfig("key_file", keyFilePath)
-	cm.SetConfig("ssh_port", sshPort)
-	cm.SetConfig("http_port", httpPort)
-	return &Module{cfgMod: cm}
+	return &Module{
+		core.NewCommonModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort),
+	}
 }
 
 // LoadModule returns the Starlark module loader with the email-specific functions.
@@ -54,32 +44,7 @@ func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
 		"get_bio": m.genGetBio(),
 	}
-	return m.cfgMod.LoadModule(ModuleName, additionalFuncs)
-}
-
-// prepareEnvirons prepares the environment variables for the module.
-func (m *Module) prepareEnvirons() error {
-	keyMaps := map[string]string{
-		"host":      "CHARM_HOST",
-		"data_dir":  "CHARM_DATA_DIR",
-		"key_file":  "CHARM_IDENTITY_KEY",
-		"ssh_port":  "CHARM_SSH_PORT",
-		"http_port": "CHARM_HTTP_PORT",
-	}
-	for cfgKey, envKey := range keyMaps {
-		val, err := m.cfgMod.GetConfig(cfgKey)
-		if err != nil {
-			continue
-		}
-		if val != "" {
-			err = os.Setenv(envKey, val)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	// TODO: rewrite with default values + override by non-empty values
-	return nil
+	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
 
 var (
@@ -93,12 +58,9 @@ func (m *Module) genGetBio() starlark.Callable {
 		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
 			return none, err
 		}
-		if err := m.prepareEnvirons(); err != nil {
-			return none, err
-		}
 
 		// create a new client
-		cc, err := client.NewClientWithDefaults()
+		cc, err := m.InitializeClient()
 		if err != nil {
 			return none, err
 		}

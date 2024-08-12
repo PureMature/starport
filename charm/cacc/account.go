@@ -3,6 +3,7 @@ package cacc
 
 import (
 	"encoding/json"
+
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv"
 	"github.com/PureMature/starport/base"
@@ -42,8 +43,9 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"get_bio":    m.genGetBio(),
-		"get_userid": m.genGetUserID(),
+		"get_bio":      m.genGetBio(),
+		"get_userid":   m.genGetUserID(),
+		"set_username": m.genSetUserName(),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -95,6 +97,29 @@ func (m *Module) genGetUserID() starlark.Callable {
 			return none, err
 		}
 		return starlark.String(id), nil
+	})
+}
+
+// genSetUserName generates the Starlark callable function to set the user's name.
+func (m *Module) genSetUserName() starlark.Callable {
+	return starlark.NewBuiltin("set_username", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		var name string
+		if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name); err != nil {
+			return none, err
+		}
+
+		// create a new client
+		cc, err := m.InitializeClient()
+		if err != nil {
+			return none, err
+		}
+
+		// set the user's name
+		usr, err := cc.SetName(name)
+		if err != nil {
+			return none, err
+		}
+		return none, nil
 	})
 }
 

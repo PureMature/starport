@@ -3,13 +3,13 @@ package core
 
 import (
 	"encoding/json"
-	"os"
+	"fmt"
 	"strconv"
 
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv"
 	"github.com/PureMature/starport/base"
-	"github.com/charmbracelet/charm/client"
+	cmcli "github.com/charmbracelet/charm/client"
 	"go.starlark.net/starlark"
 )
 
@@ -49,7 +49,7 @@ func NewCommonModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort
 // ExtendModuleLoader extends the module loader with given name and additional functions.
 func (m *CommonModule) ExtendModuleLoader(name string, addons starlark.StringDict) starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"get_bio": m.genGetBio(),
+		"get_config": m.genGetConfig(),
 	}
 	for k, v := range addons {
 		additionalFuncs[k] = v
@@ -57,58 +57,57 @@ func (m *CommonModule) ExtendModuleLoader(name string, addons starlark.StringDic
 	return m.cfgMod.LoadModule(name, additionalFuncs)
 }
 
-// prepareEnvirons prepares the environment variables for the module.
-func (m *CommonModule) prepareEnvirons() error {
-	keyMaps := map[string]string{
-		"host":      "CHARM_HOST",
-		"data_dir":  "CHARM_DATA_DIR",
-		"key_file":  "CHARM_IDENTITY_KEY",
-		"ssh_port":  "CHARM_SSH_PORT",
-		"http_port": "CHARM_HTTP_PORT",
+// InitializeClient creates a new Charm API client with the given configuration values.
+func (m *CommonModule) InitializeClient() (*cmcli.Client, error) {
+	// get default configuration from environment variables
+	cfg, err := cmcli.ConfigFromEnv()
+	if err != nil {
+		return nil, err
 	}
-	for cfgKey, envKey := range keyMaps {
-		val, err := m.cfgMod.GetConfig(cfgKey)
+	// set configuration values from the module
+	if host, err := m.cfgMod.GetConfig("host"); err == nil {
+		cfg.Host = host
+	}
+	if dataDir, err := m.cfgMod.GetConfig("data_dir"); err == nil {
+		cfg.DataDir = dataDir
+	}
+	if keyFile, err := m.cfgMod.GetConfig("key_file"); err == nil {
+		cfg.IdentityKey = keyFile
+	}
+	if sshPort, err := m.cfgMod.GetConfig("ssh_port"); err == nil {
+		cfg.SSHPort, err = strconv.Atoi(sshPort)
 		if err != nil {
-			continue
-		}
-		if val != "" {
-			err = os.Setenv(envKey, val)
-			if err != nil {
-				return err
-			}
+			return nil, fmt.Errorf("invalid SSH port: %w", err)
 		}
 	}
-	// TODO: rewrite with default values + override by non-empty values
-	return nil
+	if httpPort, err := m.cfgMod.GetConfig("http_port"); err == nil {
+		cfg.HTTPPort, err = strconv.Atoi(httpPort)
+		if err != nil {
+			return nil, fmt.Errorf("invalid HTTP port: %w", err)
+		}
+	}
+	// create a new client
+	return cmcli.NewClient(cfg)
 }
 
 var (
 	none = starlark.None
 )
 
-// genGetBio generates the Starlark callable function to get the user's profile.
-func (m *CommonModule) genGetBio() starlark.Callable {
-	return starlark.NewBuiltin("get_bio", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+// genGetConfig generates the Starlark callable function to get the configuration value.
+func (m *CommonModule) genGetConfig() starlark.Callable {
+	return starlark.NewBuiltin("get_config", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 		// check arguments
 		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
 			return none, err
 		}
-		if err := m.prepareEnvirons(); err != nil {
-			return none, err
-		}
-
-		// create a new client
-		cc, err := client.NewClientWithDefaults()
+		// get the client
+		cli, err := m.InitializeClient()
 		if err != nil {
 			return none, err
 		}
-
-		// get the user's bio
-		bio, err := cc.Bio()
-		if err != nil {
-			return none, err
-		}
-		return structToStarlark(bio)
+		// return the configuration
+		return structToStarlark(cli.Config)
 	})
 }
 

@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	bitbucket.org/neiku/hlog v0.1.2
-	github.com/1set/starlet v0.1.2-0.20240705111306-95ac95d70393
+	github.com/1set/starlet v0.1.3-0.20240812175751-6f896086c469
 	github.com/PureMature/starport/base v0.0.4
 	github.com/charmbracelet/charm v0.12.7-0.20240611121908-2785ee19555c
 	go.starlark.net v0.0.0-20240123142251-f86470692795
@@ -13,7 +13,7 @@ require (
 
 require (
 	github.com/1set/gut v0.0.0-20201117175203-a82363231997 // indirect
-	github.com/1set/starlight v0.1.1 // indirect
+	github.com/1set/starlight v0.1.2 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/caarlos0/env/v6 v6.10.1 // indirect
 	github.com/calmh/randomart v1.1.0 // indirect
@@ -32,6 +32,7 @@ require (
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/muesli/ansi v0.0.0-20211018074035-2e021307bc4b // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/go-app-paths v0.2.2 // indirect

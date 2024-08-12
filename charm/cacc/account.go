@@ -42,7 +42,8 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"get_bio": m.genGetBio(),
+		"get_bio":    m.genGetBio(),
+		"get_userid": m.genGetUserID(),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -71,6 +72,29 @@ func (m *Module) genGetBio() starlark.Callable {
 			return none, err
 		}
 		return structToStarlark(bio)
+	})
+}
+
+// genGetUserID generates the Starlark callable function to get the user's ID.
+func (m *Module) genGetUserID() starlark.Callable {
+	return starlark.NewBuiltin("get_userid", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		// check arguments
+		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
+			return none, err
+		}
+
+		// create a new client
+		cc, err := m.InitializeClient()
+		if err != nil {
+			return none, err
+		}
+
+		// get the user's ID
+		id, err := cc.ID()
+		if err != nil {
+			return none, err
+		}
+		return starlark.String(id), nil
 	})
 }
 

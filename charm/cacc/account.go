@@ -21,7 +21,7 @@ type Module struct {
 	cfgMod *base.ConfigurableModule[string]
 }
 
-// NewModule creates a new instance of Module.
+// NewModule creates a new instance of Module. It doesn't set any configuration values, nor provide any setters.
 func NewModule() *Module {
 	cm := base.NewConfigurableModule[string]()
 	return &Module{cfgMod: cm}
@@ -69,7 +69,7 @@ func (m *Module) prepareEnvirons() error {
 	for cfgKey, envKey := range keyMaps {
 		val, err := m.cfgMod.GetConfig(cfgKey)
 		if err != nil {
-			return err
+			continue
 		}
 		if val != "" {
 			err = os.Setenv(envKey, val)

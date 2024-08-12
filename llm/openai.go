@@ -4,6 +4,7 @@ package llm
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image/png"
@@ -16,7 +17,6 @@ import (
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv"
 	"github.com/1set/starlet/dataconv/types"
-	"github.com/1set/starlight/convert"
 	"github.com/PureMature/starport/base"
 	oai "github.com/sashabaranov/go-openai"
 	"go.starlark.net/starlark"
@@ -190,7 +190,7 @@ func (m *Module) genDrawFunc() starlark.Callable {
 
 		// return the response: if fullResponse is set, return the full response, otherwise return the content
 		if fullResponse {
-			return convert.NewStructWithTag(&resp, "json"), nil
+			return structToStarlark(&resp)
 		}
 
 		// if numOfChoices is 1, return the content string, otherwise return a list of contents
@@ -352,7 +352,7 @@ func (m *Module) genChatFunc() starlark.Callable {
 
 		// return the response: if fullResponse is set, return the full response, otherwise return the content
 		if fullResponse {
-			return convert.NewStructWithTag(&resp, "json"), nil
+			return structToStarlark(&resp)
 		}
 		if len(resp.Choices) == 0 {
 			return none, nil
@@ -562,4 +562,13 @@ func messagesToChatMessages(msgs []*starlark.Dict) ([]oai.ChatCompletionMessage,
 		res = append(res, msg)
 	}
 	return res, nil
+}
+
+// structToStarlark converts a Go struct to a Starlark value via JSON conversion.
+func structToStarlark(v interface{}) (starlark.Value, error) {
+	bs, err := json.Marshal(v)
+	if err != nil {
+		return none, err
+	}
+	return dataconv.DecodeStarlarkJSON(bs)
 }

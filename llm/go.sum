@@ -5,6 +5,8 @@ github.com/1set/gut v0.0.0-20201117175203-a82363231997 h1:za2jSkE1Rx56hTzBko3ZZ4
 github.com/1set/gut v0.0.0-20201117175203-a82363231997/go.mod h1:DpCCAL0dgBMQdiqPUIIRpdU9zNcIZwJjW+L/8Mb30mw=
 github.com/1set/starlet v0.1.2-0.20240625041505-6d190fac7b11 h1:9zwNGjah0Qki5oTpECaa/uDLRbcleGqAB6XfKPUoj30=
 github.com/1set/starlet v0.1.2-0.20240625041505-6d190fac7b11/go.mod h1:CUUuoFBHm0vdj5YJsWHJUHhiV79jjn4V4PZ2gQtY2o8=
+github.com/1set/starlet v0.1.2-0.20240705111306-95ac95d70393 h1:iPPsWM6S7BIOi1npmcjQK/JxGpe2XnqIrxBCPikkOdQ=
+github.com/1set/starlet v0.1.2-0.20240705111306-95ac95d70393/go.mod h1:CUUuoFBHm0vdj5YJsWHJUHhiV79jjn4V4PZ2gQtY2o8=
 github.com/1set/starlight v0.1.1 h1:U9qKgq3TvmyWDVx4KmGEAOIoTDAxxG+txzzDAAMYLEA=
 github.com/1set/starlight v0.1.1/go.mod h1:UBovtihT3K/JtaX+Nv/xBmdDk3LW6kr5yzqaYFo4KDQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=

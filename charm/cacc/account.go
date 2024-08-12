@@ -43,10 +43,11 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"set_username": m.genSetUserName(),
-		"get_bio":      m.genGetBio(),
-		"get_userid":   m.genGetUserID(),
-		"get_key_file": m.genGetKeyFile(),
+		"set_username":  m.genSetUserName(),
+		"get_bio":       m.genGetBio(),
+		"get_userid":    m.genGetUserID(),
+		"get_key_files": m.genGetKeyFiles(),
+		"get_keys":      m.genGetKeys(),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -123,9 +124,9 @@ func (m *Module) genGetUserID() starlark.Callable {
 	})
 }
 
-// genGetKeyFile generates the Starlark callable function to get the user's key file path.
-func (m *Module) genGetKeyFile() starlark.Callable {
-	return starlark.NewBuiltin("get_key_file", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+// genGetKeyFiles generates the Starlark callable function to get the user's key file paths.
+func (m *Module) genGetKeyFiles() starlark.Callable {
+	return starlark.NewBuiltin("get_key_files", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 		// check arguments
 		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
 			return none, err
@@ -144,6 +145,29 @@ func (m *Module) genGetKeyFile() starlark.Callable {
 			lst = append(lst, starlark.String(kf))
 		}
 		return starlark.NewList(lst), nil
+	})
+}
+
+// getGetKeys generates the Starlark callable function to get the user's keys.
+func (m *Module) genGetKeys() starlark.Callable {
+	return starlark.NewBuiltin("get_keys", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		// check arguments
+		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
+			return none, err
+		}
+
+		// create a new client
+		cc, err := m.InitializeClient()
+		if err != nil {
+			return none, err
+		}
+
+		// get the user's keys
+		keys, err := cc.AuthorizedKeysWithMetadata()
+		if err != nil {
+			return none, err
+		}
+		return structToStarlark(keys)
 	})
 }
 

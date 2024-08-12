@@ -158,11 +158,7 @@ func (m *Module) genGetKeyFiles() starlark.Callable {
 
 		// get the user's key file paths
 		keyFiles := cc.AuthKeyPaths()
-		var lst []starlark.Value
-		for _, kf := range keyFiles {
-			lst = append(lst, starlark.String(kf))
-		}
-		return starlark.NewList(lst), nil
+		return dataconv.GoToStarlarkViaJSON(keyFiles)
 	})
 }
 

@@ -3,13 +3,14 @@ package cacc
 
 import (
 	"encoding/json"
+	"os"
+	"strconv"
+
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv"
 	"github.com/PureMature/starport/base"
 	"github.com/charmbracelet/charm/client"
 	"go.starlark.net/starlark"
-	"os"
-	"strconv"
 )
 
 // ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('cacc', 'get_id')
@@ -87,15 +88,22 @@ var (
 
 // genGetBio generates the Starlark callable function to get the user's profile.
 func (m *Module) genGetBio() starlark.Callable {
-	return starlark.NewBuiltin("get_host", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		err := m.prepareEnvirons()
-		if err != nil {
+	return starlark.NewBuiltin("get_bio", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		// check arguments
+		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
 			return none, err
 		}
+		if err := m.prepareEnvirons(); err != nil {
+			return none, err
+		}
+
+		// create a new client
 		cc, err := client.NewClientWithDefaults()
 		if err != nil {
 			return none, err
 		}
+
+		// get the user's bio
 		bio, err := cc.Bio()
 		if err != nil {
 			return none, err

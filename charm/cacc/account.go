@@ -115,8 +115,7 @@ func (m *Module) genSetUserName() starlark.Callable {
 		}
 
 		// set the user's name
-		usr, err := cc.SetName(name)
-		if err != nil {
+		if _, err := cc.SetName(name); err != nil {
 			return none, err
 		}
 		return none, nil

@@ -2,7 +2,6 @@
 package core
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -107,15 +106,6 @@ func (m *CommonModule) genGetConfig() starlark.Callable {
 			return none, err
 		}
 		// return the configuration
-		return structToStarlark(cli.Config)
+		return dataconv.GoToStarlarkViaJSON(cli.Config)
 	})
-}
-
-// structToStarlark converts a Go struct to a Starlark value via JSON conversion.
-func structToStarlark(v interface{}) (starlark.Value, error) {
-	bs, err := json.Marshal(v)
-	if err != nil {
-		return none, err
-	}
-	return dataconv.DecodeStarlarkJSON(bs)
 }

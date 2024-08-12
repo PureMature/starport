@@ -2,8 +2,6 @@
 package cacc
 
 import (
-	"encoding/json"
-
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv"
 	"github.com/PureMature/starport/base"
@@ -117,7 +115,7 @@ func (m *Module) genGetBio() starlark.Callable {
 		if err != nil {
 			return none, err
 		}
-		return structToStarlark(bio)
+		return dataconv.GoToStarlarkViaJSON(bio)
 	})
 }
 
@@ -187,15 +185,6 @@ func (m *Module) genGetKeys() starlark.Callable {
 		if err != nil {
 			return none, err
 		}
-		return structToStarlark(keys)
+		return dataconv.GoToStarlarkViaJSON(keys)
 	})
-}
-
-// structToStarlark converts a Go struct to a Starlark value via JSON conversion.
-func structToStarlark(v interface{}) (starlark.Value, error) {
-	bs, err := json.Marshal(v)
-	if err != nil {
-		return none, err
-	}
-	return dataconv.DecodeStarlarkJSON(bs)
 }

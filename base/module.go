@@ -2,6 +2,7 @@
 package base
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/1set/starlet"
@@ -55,12 +56,17 @@ func (m *ConfigurableModule[T]) genSetConfig(name string) starlark.Callable {
 	})
 }
 
+var (
+	// ErrConfigNotSet is the error when the configuration is not set.
+	ErrConfigNotSet = errors.New("config not set")
+)
+
 // GetConfig retrieves the configuration value for a given name.
 func (m *ConfigurableModule[T]) GetConfig(name string) (T, error) {
 	getter, exists := m.configs[name]
 	if !exists || getter == nil {
 		var zero T
-		return zero, fmt.Errorf("config %s not set", name)
+		return zero, fmt.Errorf("%w: %s", ErrConfigNotSet, name)
 	}
 	return getter(), nil
 }

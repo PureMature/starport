@@ -42,6 +42,7 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
 		"set_username":  m.genSetUserName(),
+		"get_username":  m.genGetUserName(),
 		"get_host":      m.genGetHost(),
 		"get_bio":       m.genGetBio(),
 		"get_userid":    m.genGetUserID(),
@@ -74,6 +75,29 @@ func (m *Module) genSetUserName() starlark.Callable {
 			return none, err
 		}
 		return none, nil
+	})
+}
+
+// genGetUserName generates the Starlark callable function to get the user's name.
+func (m *Module) genGetUserName() starlark.Callable {
+	return starlark.NewBuiltin("get_username", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		// check arguments
+		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
+			return none, err
+		}
+
+		// create a new client
+		cc, err := m.InitializeClient()
+		if err != nil {
+			return none, err
+		}
+
+		// get the user's name from bio
+		bio, err := cc.Bio()
+		if err != nil {
+			return none, err
+		}
+		return starlark.String(bio.Name), nil
 	})
 }
 

@@ -48,7 +48,7 @@ func NewCommonModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort
 // ExtendModuleLoader extends the module loader with given name and additional functions.
 func (m *CommonModule) ExtendModuleLoader(name string, addons starlark.StringDict) starlet.ModuleLoader {
 	commonFuncs := starlark.StringDict{
-		"get_config": m.genGetConfig(),
+		"get_config": m.genBuiltin("get_config", m.getConfig),
 	}
 	for k, v := range addons {
 		commonFuncs[k] = v
@@ -93,19 +93,21 @@ var (
 	none = starlark.None
 )
 
+func (m *CommonModule) genBuiltin(name string, fn dataconv.StarlarkFunc) starlark.Callable {
+	return starlark.NewBuiltin(name, fn)
+}
+
 // genGetConfig generates the Starlark callable function to get the configuration value.
-func (m *CommonModule) genGetConfig() starlark.Callable {
-	return starlark.NewBuiltin("get_config", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		// check arguments
-		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
-			return none, err
-		}
-		// get the client
-		cli, err := m.InitializeClient()
-		if err != nil {
-			return none, err
-		}
-		// return the configuration
-		return dataconv.GoToStarlarkViaJSON(cli.Config)
-	})
+func (m *CommonModule) getConfig(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	// check arguments
+	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
+		return none, err
+	}
+	// get the client
+	cli, err := m.InitializeClient()
+	if err != nil {
+		return none, err
+	}
+	// return the configuration
+	return dataconv.GoToStarlarkViaJSON(cli.Config)
 }

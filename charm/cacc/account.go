@@ -56,7 +56,7 @@ var (
 	none = starlark.None
 )
 
-func (m *Module) genBuiltin(name string, fn func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error)) starlark.Callable {
+func (m *Module) genBuiltin(name string, fn dataconv.StarlarkFunc) starlark.Callable {
 	return starlark.NewBuiltin(name, fn)
 }
 

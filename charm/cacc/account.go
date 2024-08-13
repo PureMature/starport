@@ -152,7 +152,7 @@ func (m *Module) getKeyFiles(thread *starlark.Thread, b *starlark.Builtin, args 
 	}
 
 	keyFiles := cc.AuthKeyPaths()
-	return dataconv.GoToStarlarkViaJSON(keyFiles)
+	return core.StringsToStarlarkList(keyFiles), nil
 }
 
 func (m *Module) getKeys(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {

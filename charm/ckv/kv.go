@@ -2,6 +2,10 @@
 package ckv
 
 import (
+	"os"
+	"path/filepath"
+	"sort"
+
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv"
 	"github.com/PureMature/starport/base"
@@ -41,13 +45,7 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"set_username":  m.genBuiltin("set_username", m.setUsername),
-		"get_username":  m.genBuiltin("get_username", m.getUsername),
-		"get_host":      m.genBuiltin("get_host", m.getHost),
-		"get_bio":       m.genBuiltin("get_bio", m.getBio),
-		"get_userid":    m.genBuiltin("get_userid", m.getUserID),
-		"get_key_files": m.genBuiltin("get_key_files", m.getKeyFiles),
-		"get_keys":      m.genBuiltin("get_keys", m.getKeys),
+		"list_db": m.genBuiltin("list_db", m.listDB),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -60,24 +58,7 @@ func (m *Module) genBuiltin(name string, fn dataconv.StarlarkFunc) starlark.Call
 	return starlark.NewBuiltin(name, fn)
 }
 
-func (m *Module) setUsername(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var name string
-	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name); err != nil {
-		return none, err
-	}
-
-	cc, err := m.InitializeClient()
-	if err != nil {
-		return none, err
-	}
-
-	if _, err := cc.SetName(name); err != nil {
-		return none, err
-	}
-	return none, nil
-}
-
-func (m *Module) getUsername(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func (m *Module) listDB(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
 		return none, err
 	}
@@ -87,87 +68,28 @@ func (m *Module) getUsername(thread *starlark.Thread, b *starlark.Builtin, args 
 		return none, err
 	}
 
-	bio, err := cc.Bio()
+	// get data path
+	dd, err := cc.DataPath()
 	if err != nil {
 		return none, err
 	}
-	return starlark.String(bio.Name), nil
-}
+	dp := filepath.Join(dd, "kv")
 
-func (m *Module) getHost(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
-		return none, err
-	}
-
-	cc, err := m.InitializeClient()
+	// list db folders
+	entries, err := os.ReadDir(dp)
 	if err != nil {
-		return none, err
+		return nil, err
+	}
+	var dbList []string
+	for _, e := range entries {
+		if e.IsDir() {
+			dbList = append(dbList, e.Name())
+		}
 	}
 
-	return starlark.String(cc.Config.Host), nil
-}
+	// sort dbList
+	sort.Strings(dbList)
 
-func (m *Module) getBio(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
-		return none, err
-	}
-
-	cc, err := m.InitializeClient()
-	if err != nil {
-		return none, err
-	}
-
-	bio, err := cc.Bio()
-	if err != nil {
-		return none, err
-	}
-	return dataconv.GoToStarlarkViaJSON(bio)
-}
-
-func (m *Module) getUserID(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
-		return none, err
-	}
-
-	cc, err := m.InitializeClient()
-	if err != nil {
-		return none, err
-	}
-
-	id, err := cc.ID()
-	if err != nil {
-		return none, err
-	}
-	return starlark.String(id), nil
-}
-
-func (m *Module) getKeyFiles(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
-		return none, err
-	}
-
-	cc, err := m.InitializeClient()
-	if err != nil {
-		return none, err
-	}
-
-	keyFiles := cc.AuthKeyPaths()
-	return dataconv.GoToStarlarkViaJSON(keyFiles)
-}
-
-func (m *Module) getKeys(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
-		return none, err
-	}
-
-	cc, err := m.InitializeClient()
-	if err != nil {
-		return none, err
-	}
-
-	keys, err := cc.AuthorizedKeysWithMetadata()
-	if err != nil {
-		return none, err
-	}
-	return dataconv.GoToStarlarkViaJSON(keys)
+	// return dbList
+	return core.StringsToStarlarkList(dbList), nil
 }

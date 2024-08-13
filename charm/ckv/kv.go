@@ -1,5 +1,5 @@
-// Package cacc provides a Starlark module for Charm Accounts.
-package cacc
+// Package ckv provides a Starlark module for Charm KV.
+package ckv
 
 import (
 	"github.com/1set/starlet"
@@ -9,8 +9,8 @@ import (
 	"go.starlark.net/starlark"
 )
 
-// ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('cacc', 'get_bio')
-const ModuleName = "cacc"
+// ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('ckv', 'get_id')
+const ModuleName = "ckv"
 
 // Module wraps the ConfigurableModule with specific functionality for sending emails.
 type Module struct {

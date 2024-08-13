@@ -2,6 +2,7 @@
 package ckv
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -10,6 +11,8 @@ import (
 	"github.com/1set/starlet/dataconv"
 	"github.com/PureMature/starport/base"
 	"github.com/PureMature/starport/charm/core"
+	"github.com/charmbracelet/charm/kv"
+	"github.com/dgraph-io/badger/v3"
 	"go.starlark.net/starlark"
 )
 
@@ -19,12 +22,14 @@ const ModuleName = "ckv"
 // Module wraps the ConfigurableModule with specific functionality for sending emails.
 type Module struct {
 	*core.CommonModule
+	dbs map[string]*kv.KV
 }
 
 // NewModule creates a new instance of Module. It doesn't set any configuration values, nor provide any setters.
 func NewModule() *Module {
 	return &Module{
 		core.NewCommonModule(),
+		make(map[string]*kv.KV),
 	}
 }
 
@@ -32,6 +37,7 @@ func NewModule() *Module {
 func NewModuleWithConfig(host, dataDirPath, keyFilePath string, sshPort, httpPort uint16) *Module {
 	return &Module{
 		core.NewCommonModuleWithConfig(host, dataDirPath, keyFilePath, sshPort, httpPort),
+		make(map[string]*kv.KV),
 	}
 }
 
@@ -39,6 +45,7 @@ func NewModuleWithConfig(host, dataDirPath, keyFilePath string, sshPort, httpPor
 func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.ConfigGetter[string]) *Module {
 	return &Module{
 		core.NewCommonModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort),
+		make(map[string]*kv.KV),
 	}
 }
 
@@ -46,13 +53,50 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
 		"list_db": m.genBuiltin("list_db", m.listDB),
+		"get":     m.genBuiltin("get", m.getString),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
 
 var (
-	none = starlark.None
+	none      = starlark.None
+	defaultDB = "starcli.kv.user.default"
 )
+
+func (m *Module) getDBClient(name string) (*kv.KV, error) {
+	// use default db if name is empty
+	if name == "" {
+		name = defaultDB
+	}
+	// check if db is already opened
+	if db, ok := m.dbs[name]; ok {
+		return db, nil
+	}
+
+	// get client for opening db
+	cc, err := m.InitializeClient()
+	if err != nil {
+		return nil, err
+	}
+	// get data path
+	dd, err := cc.DataPath()
+	if err != nil {
+		return nil, err
+	}
+	pn := filepath.Join(dd, "/kv/", name)
+	// for BadgerDB
+	opts := badger.DefaultOptions(pn).WithLoggingLevel(badger.ERROR)
+	opts.Logger = nil
+	opts = opts.WithValueLogFileSize(10000000)
+
+	// open db & save to cache
+	db, err := kv.Open(cc, name, opts)
+	if err != nil {
+		return nil, err
+	}
+	m.dbs[name] = db
+	return db, nil
+}
 
 func (m *Module) genBuiltin(name string, fn dataconv.StarlarkFunc) starlark.Callable {
 	return starlark.NewBuiltin(name, fn)
@@ -92,4 +136,30 @@ func (m *Module) listDB(thread *starlark.Thread, b *starlark.Builtin, args starl
 
 	// return dbList
 	return core.StringsToStarlarkList(dbList), nil
+}
+
+func (m *Module) getString(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var (
+		key string
+		db  string
+	)
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "db?", &db); err != nil {
+		return none, err
+	}
+
+	// get db client
+	dc, err := m.getDBClient(db)
+	if err != nil {
+		return none, err
+	}
+
+	// get value
+	val, err := dc.Get([]byte(key))
+	if err != nil {
+		if nf := errors.Is(err, badger.ErrKeyNotFound); nf {
+			return none, nil
+		}
+		return none, err
+	}
+	return starlark.String(val), nil
 }

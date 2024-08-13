@@ -54,6 +54,7 @@ func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
 		"list_db": m.genBuiltin("list_db", m.listDB),
 		"get":     m.genBuiltin("get", m.getString),
+		"set":     m.genBuiltin("set", m.setString),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -162,4 +163,28 @@ func (m *Module) getString(thread *starlark.Thread, b *starlark.Builtin, args st
 		return none, err
 	}
 	return starlark.String(val), nil
+}
+
+func (m *Module) setString(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var (
+		key   string
+		value string
+		db    string
+	)
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "value", &value, "db?", &db); err != nil {
+		return none, err
+	}
+
+	// get db client
+	dc, err := m.getDBClient(db)
+	if err != nil {
+		return none, err
+	}
+
+	// set value
+	err = dc.Set([]byte(key), []byte(value))
+	if err != nil {
+		return none, err
+	}
+	return none, nil
 }

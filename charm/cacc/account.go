@@ -41,13 +41,13 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"set_username":  m.genSetUserName(),
-		"get_username":  m.genGetUserName(),
-		"get_host":      m.genGetHost(),
-		"get_bio":       m.genGetBio(),
-		"get_userid":    m.genGetUserID(),
-		"get_key_files": m.genGetKeyFiles(),
-		"get_keys":      m.genGetKeys(),
+		"set_username":  m.genBuiltin("set_username", m.setUsername),
+		"get_username":  m.genBuiltin("get_username", m.getUsername),
+		"get_host":      m.genBuiltin("get_host", m.getHost),
+		"get_bio":       m.genBuiltin("get_bio", m.getBio),
+		"get_userid":    m.genBuiltin("get_userid", m.getUserID),
+		"get_key_files": m.genBuiltin("get_key_files", m.getKeyFiles),
+		"get_keys":      m.genBuiltin("get_keys", m.getKeys),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -56,155 +56,118 @@ var (
 	none = starlark.None
 )
 
-// genSetUserName generates the Starlark callable function to set the user's name.
-func (m *Module) genSetUserName() starlark.Callable {
-	return starlark.NewBuiltin("set_username", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		var name string
-		if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name); err != nil {
-			return none, err
-		}
-
-		// create a new client
-		cc, err := m.InitializeClient()
-		if err != nil {
-			return none, err
-		}
-
-		// set the user's name
-		if _, err := cc.SetName(name); err != nil {
-			return none, err
-		}
-		return none, nil
-	})
+func (m *Module) genBuiltin(name string, fn func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error)) starlark.Callable {
+	return starlark.NewBuiltin(name, fn)
 }
 
-// genGetUserName generates the Starlark callable function to get the user's name.
-func (m *Module) genGetUserName() starlark.Callable {
-	return starlark.NewBuiltin("get_username", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		// check arguments
-		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
-			return none, err
-		}
+func (m *Module) setUsername(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var name string
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name); err != nil {
+		return none, err
+	}
 
-		// create a new client
-		cc, err := m.InitializeClient()
-		if err != nil {
-			return none, err
-		}
+	cc, err := m.InitializeClient()
+	if err != nil {
+		return none, err
+	}
 
-		// get the user's name from bio
-		bio, err := cc.Bio()
-		if err != nil {
-			return none, err
-		}
-		return starlark.String(bio.Name), nil
-	})
+	if _, err := cc.SetName(name); err != nil {
+		return none, err
+	}
+	return none, nil
 }
 
-// getGetHost generates the Starlark callable function to get the user's host.
-func (m *Module) genGetHost() starlark.Callable {
-	return starlark.NewBuiltin("get_host", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		// check arguments
-		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
-			return none, err
-		}
+func (m *Module) getUsername(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
+		return none, err
+	}
 
-		// create a new client
-		cc, err := m.InitializeClient()
-		if err != nil {
-			return none, err
-		}
+	cc, err := m.InitializeClient()
+	if err != nil {
+		return none, err
+	}
 
-		// get the user's host
-		return starlark.String(cc.Config.Host), nil
-	})
+	bio, err := cc.Bio()
+	if err != nil {
+		return none, err
+	}
+	return starlark.String(bio.Name), nil
 }
 
-// genGetBio generates the Starlark callable function to get the user's profile.
-func (m *Module) genGetBio() starlark.Callable {
-	return starlark.NewBuiltin("get_bio", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		// check arguments
-		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
-			return none, err
-		}
+func (m *Module) getHost(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
+		return none, err
+	}
 
-		// create a new client
-		cc, err := m.InitializeClient()
-		if err != nil {
-			return none, err
-		}
+	cc, err := m.InitializeClient()
+	if err != nil {
+		return none, err
+	}
 
-		// get the user's bio
-		bio, err := cc.Bio()
-		if err != nil {
-			return none, err
-		}
-		return dataconv.GoToStarlarkViaJSON(bio)
-	})
+	return starlark.String(cc.Config.Host), nil
 }
 
-// genGetUserID generates the Starlark callable function to get the user's ID.
-func (m *Module) genGetUserID() starlark.Callable {
-	return starlark.NewBuiltin("get_userid", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		// check arguments
-		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
-			return none, err
-		}
+func (m *Module) getBio(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
+		return none, err
+	}
 
-		// create a new client
-		cc, err := m.InitializeClient()
-		if err != nil {
-			return none, err
-		}
+	cc, err := m.InitializeClient()
+	if err != nil {
+		return none, err
+	}
 
-		// get the user's ID
-		id, err := cc.ID()
-		if err != nil {
-			return none, err
-		}
-		return starlark.String(id), nil
-	})
+	bio, err := cc.Bio()
+	if err != nil {
+		return none, err
+	}
+	return dataconv.GoToStarlarkViaJSON(bio)
 }
 
-// genGetKeyFiles generates the Starlark callable function to get the user's key file paths.
-func (m *Module) genGetKeyFiles() starlark.Callable {
-	return starlark.NewBuiltin("get_key_files", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		// check arguments
-		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
-			return none, err
-		}
+func (m *Module) getUserID(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
+		return none, err
+	}
 
-		// create a new client
-		cc, err := m.InitializeClient()
-		if err != nil {
-			return none, err
-		}
+	cc, err := m.InitializeClient()
+	if err != nil {
+		return none, err
+	}
 
-		// get the user's key file paths
-		keyFiles := cc.AuthKeyPaths()
-		return dataconv.GoToStarlarkViaJSON(keyFiles)
-	})
+	id, err := cc.ID()
+	if err != nil {
+		return none, err
+	}
+	return starlark.String(id), nil
 }
 
-// getGetKeys generates the Starlark callable function to get the user's keys.
-func (m *Module) genGetKeys() starlark.Callable {
-	return starlark.NewBuiltin("get_keys", func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		// check arguments
-		if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
-			return none, err
-		}
+func (m *Module) getKeyFiles(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
+		return none, err
+	}
 
-		// create a new client
-		cc, err := m.InitializeClient()
-		if err != nil {
-			return none, err
-		}
+	cc, err := m.InitializeClient()
+	if err != nil {
+		return none, err
+	}
 
-		// get the user's keys
-		keys, err := cc.AuthorizedKeysWithMetadata()
-		if err != nil {
-			return none, err
-		}
-		return dataconv.GoToStarlarkViaJSON(keys)
-	})
+	keyFiles := cc.AuthKeyPaths()
+	return dataconv.GoToStarlarkViaJSON(keyFiles)
+}
+
+func (m *Module) getKeys(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, 0); err != nil {
+		return none, err
+	}
+
+	cc, err := m.InitializeClient()
+	if err != nil {
+		return none, err
+	}
+
+	keys, err := cc.AuthorizedKeysWithMetadata()
+	if err != nil {
+		return none, err
+	}
+	return dataconv.GoToStarlarkViaJSON(keys)
 }

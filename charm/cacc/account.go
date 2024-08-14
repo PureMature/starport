@@ -4,6 +4,7 @@ package cacc
 import (
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv"
+	tps "github.com/1set/starlet/dataconv/types"
 	"github.com/PureMature/starport/base"
 	"github.com/PureMature/starport/charm/core"
 	"go.starlark.net/starlark"
@@ -41,13 +42,13 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"set_username":  m.genBuiltin("set_username", m.setUsername),
-		"get_username":  m.genBuiltin("get_username", m.getUsername),
-		"get_host":      m.genBuiltin("get_host", m.getHost),
-		"get_bio":       m.genBuiltin("get_bio", m.getBio),
-		"get_userid":    m.genBuiltin("get_userid", m.getUserID),
-		"get_key_files": m.genBuiltin("get_key_files", m.getKeyFiles),
-		"get_keys":      m.genBuiltin("get_keys", m.getKeys),
+		"set_username":  starlark.NewBuiltin(ModuleName+".set_username", m.setUsername),
+		"get_username":  starlark.NewBuiltin(ModuleName+".get_username", m.getUsername),
+		"get_host":      starlark.NewBuiltin(ModuleName+".get_host", m.getHost),
+		"get_bio":       starlark.NewBuiltin(ModuleName+".get_bio", m.getBio),
+		"get_userid":    starlark.NewBuiltin(ModuleName+".get_userid", m.getUserID),
+		"get_key_files": starlark.NewBuiltin(ModuleName+".get_key_files", m.getKeyFiles),
+		"get_keys":      starlark.NewBuiltin(ModuleName+".get_keys", m.getKeys),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -61,7 +62,7 @@ func (m *Module) genBuiltin(name string, fn dataconv.StarlarkFunc) starlark.Call
 }
 
 func (m *Module) setUsername(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var name string
+	var name tps.StringOrBytes
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name); err != nil {
 		return none, err
 	}
@@ -71,7 +72,7 @@ func (m *Module) setUsername(thread *starlark.Thread, b *starlark.Builtin, args 
 		return none, err
 	}
 
-	if _, err := cc.SetName(name); err != nil {
+	if _, err := cc.SetName(name.GoString()); err != nil {
 		return none, err
 	}
 	return none, nil

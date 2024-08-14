@@ -9,12 +9,13 @@ import (
 	"path/filepath"
 
 	"github.com/1set/starlet"
-	"github.com/1set/starlet/dataconv"
 	tps "github.com/1set/starlet/dataconv/types"
 	"github.com/PureMature/starport/base"
 	"github.com/PureMature/starport/charm/core"
 	"github.com/charmbracelet/charm/fs"
+	stdtime "go.starlark.net/lib/time"
 	"go.starlark.net/starlark"
+	"go.starlark.net/starlarkstruct"
 )
 
 // ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('cfs', 'listdir')
@@ -53,11 +54,11 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"read":    starlark.NewBuiltin("read", m.readFile),
-		"write":   starlark.NewBuiltin("write", m.writeFile),
-		"remove":  starlark.NewBuiltin("remove", m.removeFile),
-		"stat":    starlark.NewBuiltin("stat", m.statFile),
-		"listdir": starlark.NewBuiltin("listdir", m.listDirContents),
+		"read":    starlark.NewBuiltin(ModuleName+".read", m.readFile),
+		"write":   starlark.NewBuiltin(ModuleName+".write", m.writeFile),
+		"remove":  starlark.NewBuiltin(ModuleName+".remove", m.removeFile),
+		"stat":    starlark.NewBuiltin(ModuleName+".stat", m.statFile),
+		"listdir": starlark.NewBuiltin(ModuleName+".listdir", m.listDirContents),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -89,7 +90,7 @@ func (m *Module) getClient() (*fs.FS, error) {
 }
 
 func (m *Module) readFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var name string
+	var name tps.StringOrBytes
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name); err != nil {
 		return nil, err
 	}
@@ -101,7 +102,7 @@ func (m *Module) readFile(thread *starlark.Thread, b *starlark.Builtin, args sta
 	}
 
 	// open file for reading
-	f, err := cf.Open(name)
+	f, err := cf.Open(name.GoString())
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +127,7 @@ func (m *Module) readFile(thread *starlark.Thread, b *starlark.Builtin, args sta
 }
 
 func (m *Module) writeFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var name, content string
+	var name, content tps.StringOrBytes
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name, "content", &content); err != nil {
 		return nil, err
 	}
@@ -138,13 +139,14 @@ func (m *Module) writeFile(thread *starlark.Thread, b *starlark.Builtin, args st
 	}
 
 	// write as file
-	vf := CreateVirtualFileFromString(name, content)
-	err = cf.WriteFile(name, vf)
+	fn := name.GoString()
+	vf := CreateVirtualFile(fn, content.GoBytes())
+	err = cf.WriteFile(fn, vf)
 	return none, err
 }
 
 func (m *Module) removeFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var name string
+	var name tps.StringOrBytes
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name); err != nil {
 		return nil, err
 	}
@@ -156,12 +158,12 @@ func (m *Module) removeFile(thread *starlark.Thread, b *starlark.Builtin, args s
 	}
 
 	// delete the file
-	err = cf.Remove(name)
+	err = cf.Remove(name.GoString())
 	return none, err
 }
 
 func (m *Module) statFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var name string
+	var name tps.StringOrBytes
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name); err != nil {
 		return nil, err
 	}
@@ -173,7 +175,7 @@ func (m *Module) statFile(thread *starlark.Thread, b *starlark.Builtin, args sta
 	}
 
 	// open file for stat
-	f, err := cf.Open(name)
+	f, err := cf.Open(name.GoString())
 	if err != nil {
 		return nil, err
 	}
@@ -186,14 +188,23 @@ func (m *Module) statFile(thread *starlark.Thread, b *starlark.Builtin, args sta
 	}
 
 	// convert
-	// TODO: like https://github.com/1set/starlet/blob/master/lib/file/stat.go
-	return dataconv.GoToStarlarkViaJSON(fi)
+	fn := fi.Name()
+	fields := starlark.StringDict{
+		"name":     starlark.String(fn),
+		"path":     starlark.String(name),
+		"ext":      starlark.String(filepath.Ext(fn)),
+		"size":     starlark.MakeInt64(fi.Size()),
+		"mode":     starlark.String(fi.Mode().String()),
+		"mod_time": stdtime.Time(fi.ModTime()),
+		"is_dir":   starlark.Bool(fi.IsDir()),
+	}
+	return starlarkstruct.FromStringDict(starlark.String("file_stat"), fields), nil
 }
 
 // listDirContents returns a list of directory contents.
 func (m *Module) listDirContents(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var (
-		path       string
+		path       tps.StringOrBytes
 		recursive  bool
 		filterFunc = tps.NullableCallable{}
 	)
@@ -213,8 +224,11 @@ func (m *Module) listDirContents(thread *starlark.Thread, b *starlark.Builtin, a
 	}
 
 	// scan directory contents
-	var sl []starlark.Value
-	if err := gofs.WalkDir(cf, path, func(p string, info gofs.DirEntry, err error) error {
+	var (
+		ps = path.GoString()
+		sl []starlark.Value
+	)
+	if err := gofs.WalkDir(cf, ps, func(p string, info gofs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -237,7 +251,7 @@ func (m *Module) listDirContents(thread *starlark.Thread, b *starlark.Builtin, a
 		sl = append(sl, sp)
 
 		// check if we should list recursively
-		if !recursive && p != path && info.IsDir() {
+		if !recursive && p != ps && info.IsDir() {
 			return filepath.SkipDir
 		}
 		return nil

@@ -9,6 +9,7 @@ import (
 
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv"
+	tps "github.com/1set/starlet/dataconv/types"
 	"github.com/PureMature/starport/base"
 	"github.com/PureMature/starport/charm/core"
 	"github.com/charmbracelet/charm/kv"
@@ -53,18 +54,18 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
 		// kv ops
-		"get":         starlark.NewBuiltin("get", m.getString),
-		"set":         starlark.NewBuiltin("set", m.setString),
-		"get_json":    starlark.NewBuiltin("get_json", m.getJSON),
-		"set_json":    starlark.NewBuiltin("set_json", m.setJSON),
-		"delete":      starlark.NewBuiltin("delete", m.deleteKey),
-		"list":        starlark.NewBuiltin("list", m.listAll),
-		"list_keys":   starlark.NewBuiltin("list_keys", m.listKeys),
-		"list_values": starlark.NewBuiltin("list_values", m.listValues),
+		"get":         starlark.NewBuiltin(ModuleName+".get", m.getString),
+		"set":         starlark.NewBuiltin(ModuleName+".set", m.setString),
+		"get_json":    starlark.NewBuiltin(ModuleName+".get_json", m.getJSON),
+		"set_json":    starlark.NewBuiltin(ModuleName+".set_json", m.setJSON),
+		"delete":      starlark.NewBuiltin(ModuleName+".delete", m.deleteKey),
+		"list":        starlark.NewBuiltin(ModuleName+".list", m.listAll),
+		"list_keys":   starlark.NewBuiltin(ModuleName+".list_keys", m.listKeys),
+		"list_values": starlark.NewBuiltin(ModuleName+".list_values", m.listValues),
 		// db ops
-		"list_db": starlark.NewBuiltin("list_db", m.listDB),
-		"sync":    starlark.NewBuiltin("sync", m.syncDB),
-		"reset":   starlark.NewBuiltin("reset", m.resetLocalCopy),
+		"list_db": starlark.NewBuiltin(ModuleName+".list_db", m.listDB),
+		"sync":    starlark.NewBuiltin(ModuleName+".sync", m.syncDB),
+		"reset":   starlark.NewBuiltin(ModuleName+".reset", m.resetLocalCopy),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -146,25 +147,27 @@ func (m *Module) listDB(thread *starlark.Thread, b *starlark.Builtin, args starl
 	return core.StringsToStarlarkList(dbList), nil
 }
 
-func (m *Module) getValue(key, db string) (string, error) {
+func (m *Module) getValue(db string, key []byte, failOnMissing bool) ([]byte, error) {
 	// get db client
 	dc, err := m.getDBClient(db)
 	if err != nil {
-		return emptyStr, err
+		return nil, err
 	}
 
 	// get value
-	val, err := dc.Get([]byte(key))
+	val, err := dc.Get(key)
 	if err != nil {
-		if nf := errors.Is(err, badger.ErrKeyNotFound); nf {
-			return emptyStr, nil
+		if !failOnMissing {
+			if nf := errors.Is(err, badger.ErrKeyNotFound); nf {
+				return nil, nil
+			}
 		}
-		return emptyStr, err
+		return nil, err
 	}
-	return string(val), nil
+	return val, nil
 }
 
-func (m *Module) setValue(key, value, db string) error {
+func (m *Module) setValue(db string, key, value []byte) error {
 	// get db client
 	dc, err := m.getDBClient(db)
 	if err != nil {
@@ -172,7 +175,7 @@ func (m *Module) setValue(key, value, db string) error {
 	}
 
 	// set value
-	err = dc.Set([]byte(key), []byte(value))
+	err = dc.Set(key, value)
 	if err != nil {
 		return err
 	}
@@ -181,15 +184,16 @@ func (m *Module) setValue(key, value, db string) error {
 
 func (m *Module) getString(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var (
-		key string
-		db  string
+		key           tps.StringOrBytes
+		failOnMissing bool
+		db            tps.StringOrBytes
 	)
-	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "db?", &db); err != nil {
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "fail_missing?", &failOnMissing, "db?", &db); err != nil {
 		return none, err
 	}
 
 	// get value
-	vs, err := m.getValue(key, db)
+	vs, err := m.getValue(db.GoString(), key.GoBytes(), failOnMissing)
 	if err != nil {
 		return none, err
 	}
@@ -198,78 +202,79 @@ func (m *Module) getString(thread *starlark.Thread, b *starlark.Builtin, args st
 
 func (m *Module) setString(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var (
-		key   string
-		value string
-		db    string
+		key   tps.StringOrBytes
+		value starlark.Value
+		db    tps.StringOrBytes
 	)
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "value", &value, "db?", &db); err != nil {
 		return none, err
 	}
 
-	// set value
-	err := m.setValue(key, value, db)
+	// set string representation of value
+	err := m.setValue(db.GoString(), key.GoBytes(), []byte(dataconv.StarString(value)))
 	return none, err
 }
 
 func (m *Module) getJSON(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var (
-		key string
-		db  string
+		key           tps.StringOrBytes
+		failOnMissing bool
+		db            tps.StringOrBytes
 	)
-	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "db?", &db); err != nil {
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "fail_missing?", &failOnMissing, "db?", &db); err != nil {
 		return none, err
 	}
 
 	// get value as string
-	vs, err := m.getValue(key, db)
+	vs, err := m.getValue(db.GoString(), key.GoBytes(), failOnMissing)
 	if err != nil {
 		return none, err
 	}
 
 	// for unset key, return None
-	if vs == emptyStr {
+	if vs == nil {
 		return none, nil
 	}
 
 	// parse JSON
-	return dataconv.DecodeStarlarkJSON([]byte(vs))
+	return dataconv.DecodeStarlarkJSON(vs)
 }
 
 func (m *Module) setJSON(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var (
-		key   string
+		key   tps.StringOrBytes
 		value starlark.Value
-		db    string
+		db    tps.StringOrBytes
 	)
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "value", &value, "db?", &db); err != nil {
 		return none, err
 	}
 
-	// convert value to JSON
+	// convert value to JSON and set
 	js, err := dataconv.EncodeStarlarkJSON(value)
 	if err != nil {
 		return none, err
 	}
-	return none, m.setValue(key, js, db)
+	return none, m.setValue(db.GoString(), key.GoBytes(), []byte(js))
 }
 
 func (m *Module) deleteKey(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var (
-		key string
-		db  string
+		key tps.StringOrBytes
+		db  tps.StringOrBytes
 	)
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "db?", &db); err != nil {
 		return none, err
 	}
 
 	// get db client
-	dc, err := m.getDBClient(db)
+	dc, err := m.getDBClient(db.GoString())
 	if err != nil {
 		return none, err
 	}
 
 	// delete key
-	err = dc.Delete([]byte(key))
+	err = dc.Delete(key.GoBytes())
 	return none, err
 }
 
@@ -340,7 +345,7 @@ func (m *Module) listItems(db string, syncFirst, keyOnly, valueOnly, reverse boo
 
 func (m *Module) listKeys(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var (
-		db      string
+		db      tps.StringOrBytes
 		sync    = true
 		reverse bool
 		limit   = 0
@@ -350,12 +355,12 @@ func (m *Module) listKeys(thread *starlark.Thread, b *starlark.Builtin, args sta
 	}
 
 	// list keys
-	return m.listItems(db, sync, true, false, reverse, limit)
+	return m.listItems(db.GoString(), sync, true, false, reverse, limit)
 }
 
 func (m *Module) listValues(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var (
-		db      string
+		db      tps.StringOrBytes
 		sync    = true
 		reverse bool
 		limit   = 0
@@ -365,12 +370,12 @@ func (m *Module) listValues(thread *starlark.Thread, b *starlark.Builtin, args s
 	}
 
 	// list values
-	return m.listItems(db, sync, false, true, reverse, limit)
+	return m.listItems(db.GoString(), sync, false, true, reverse, limit)
 }
 
 func (m *Module) listAll(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var (
-		db      string
+		db      tps.StringOrBytes
 		sync    = true
 		reverse bool
 		limit   = 0
@@ -380,17 +385,17 @@ func (m *Module) listAll(thread *starlark.Thread, b *starlark.Builtin, args star
 	}
 
 	// list items
-	return m.listItems(db, sync, false, false, reverse, limit)
+	return m.listItems(db.GoString(), sync, false, false, reverse, limit)
 }
 
 func (m *Module) syncDB(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var db string
+	var db tps.StringOrBytes
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "db?", &db); err != nil {
 		return none, err
 	}
 
 	// get db client
-	dc, err := m.getDBClient(db)
+	dc, err := m.getDBClient(db.GoString())
 	if err != nil {
 		return none, err
 	}
@@ -401,13 +406,13 @@ func (m *Module) syncDB(thread *starlark.Thread, b *starlark.Builtin, args starl
 }
 
 func (m *Module) resetLocalCopy(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var db string
+	var db tps.StringOrBytes
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "db?", &db); err != nil {
 		return none, err
 	}
 
 	// get db client
-	dc, err := m.getDBClient(db)
+	dc, err := m.getDBClient(db.GoString())
 	if err != nil {
 		return none, err
 	}
@@ -418,6 +423,6 @@ func (m *Module) resetLocalCopy(thread *starlark.Thread, b *starlark.Builtin, ar
 	}
 
 	// remove from cache
-	delete(m.dbs, db)
+	delete(m.dbs, db.GoString())
 	return none, nil
 }

@@ -9,12 +9,13 @@ import (
 	"path/filepath"
 
 	"github.com/1set/starlet"
-	"github.com/1set/starlet/dataconv"
 	tps "github.com/1set/starlet/dataconv/types"
 	"github.com/PureMature/starport/base"
 	"github.com/PureMature/starport/charm/core"
 	"github.com/charmbracelet/charm/fs"
+	stdtime "go.starlark.net/lib/time"
 	"go.starlark.net/starlark"
+	"go.starlark.net/starlarkstruct"
 )
 
 // ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('cfs', 'listdir')
@@ -187,8 +188,17 @@ func (m *Module) statFile(thread *starlark.Thread, b *starlark.Builtin, args sta
 	}
 
 	// convert
-	// TODO: like https://github.com/1set/starlet/blob/master/lib/file/stat.go
-	return dataconv.GoToStarlarkViaJSON(fi)
+	fn := fi.Name()
+	fields := starlark.StringDict{
+		"name":     starlark.String(fn),
+		"path":     starlark.String(name),
+		"ext":      starlark.String(filepath.Ext(fn)),
+		"size":     starlark.MakeInt64(fi.Size()),
+		"mode":     starlark.String(fi.Mode().String()),
+		"mod_time": stdtime.Time(fi.ModTime()),
+		"is_dir":   starlark.Bool(fi.IsDir()),
+	}
+	return starlarkstruct.FromStringDict(starlark.String("file_stat"), fields), nil
 }
 
 // listDirContents returns a list of directory contents.

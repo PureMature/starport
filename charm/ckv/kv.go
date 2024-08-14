@@ -147,7 +147,7 @@ func (m *Module) listDB(thread *starlark.Thread, b *starlark.Builtin, args starl
 	return core.StringsToStarlarkList(dbList), nil
 }
 
-func (m *Module) getValue(db string, key []byte) ([]byte, error) {
+func (m *Module) getValue(db string, key []byte, failOnMissing bool) ([]byte, error) {
 	// get db client
 	dc, err := m.getDBClient(db)
 	if err != nil {
@@ -157,9 +157,10 @@ func (m *Module) getValue(db string, key []byte) ([]byte, error) {
 	// get value
 	val, err := dc.Get(key)
 	if err != nil {
-		// TODO: handle
-		if nf := errors.Is(err, badger.ErrKeyNotFound); nf {
-			return nil, nil
+		if !failOnMissing {
+			if nf := errors.Is(err, badger.ErrKeyNotFound); nf {
+				return nil, nil
+			}
 		}
 		return nil, err
 	}
@@ -183,15 +184,16 @@ func (m *Module) setValue(db string, key, value []byte) error {
 
 func (m *Module) getString(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var (
-		key tps.StringOrBytes
-		db  tps.StringOrBytes
+		key           tps.StringOrBytes
+		failOnMissing bool
+		db            tps.StringOrBytes
 	)
-	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "db?", &db); err != nil {
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "fail_missing?", &failOnMissing, "db?", &db); err != nil {
 		return none, err
 	}
 
 	// get value
-	vs, err := m.getValue(db.GoString(), key.GoBytes())
+	vs, err := m.getValue(db.GoString(), key.GoBytes(), failOnMissing)
 	if err != nil {
 		return none, err
 	}
@@ -215,15 +217,16 @@ func (m *Module) setString(thread *starlark.Thread, b *starlark.Builtin, args st
 
 func (m *Module) getJSON(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var (
-		key tps.StringOrBytes
-		db  tps.StringOrBytes
+		key           tps.StringOrBytes
+		failOnMissing bool
+		db            tps.StringOrBytes
 	)
-	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "db?", &db); err != nil {
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "fail_missing?", &failOnMissing, "db?", &db); err != nil {
 		return none, err
 	}
 
 	// get value as string
-	vs, err := m.getValue(db.GoString(), key.GoBytes())
+	vs, err := m.getValue(db.GoString(), key.GoBytes(), failOnMissing)
 	if err != nil {
 		return none, err
 	}

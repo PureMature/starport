@@ -2,6 +2,9 @@
 package cfs
 
 import (
+	"bytes"
+	"io"
+
 	"github.com/1set/starlet"
 	"github.com/PureMature/starport/base"
 	"github.com/PureMature/starport/charm/core"
@@ -45,6 +48,8 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
+		"read": starlark.NewBuiltin("read", m.readFile),
+
 		//// kv ops
 		//"get":         starlark.NewBuiltin("get", m.getString),
 		//"set":         starlark.NewBuiltin("set", m.setString),
@@ -86,4 +91,30 @@ func (m *Module) getClient() (*fs.FS, error) {
 	}
 	m.cf = cf
 	return cf, nil
+}
+
+func (m *Module) readFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var fp string
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "path", &fp); err != nil {
+		return nil, err
+	}
+
+	// get the client
+	cf, err := m.getClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// read the file content
+	buf := bytes.NewBuffer(nil)
+	f, err := cf.Open(fp)
+	if err != nil {
+		return nil, err
+	}
+	// cfs.read("/mybatch")
+	_, err = io.Copy(buf, f)
+	if err != nil {
+		return nil, err
+	}
+	return starlark.String(buf.Bytes()), nil
 }

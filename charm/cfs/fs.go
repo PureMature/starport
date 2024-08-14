@@ -1,0 +1,89 @@
+// Package cfs provides a Starlark module for Charm FS.
+package cfs
+
+import (
+	"github.com/1set/starlet"
+	"github.com/PureMature/starport/base"
+	"github.com/PureMature/starport/charm/core"
+	"github.com/charmbracelet/charm/fs"
+	"go.starlark.net/starlark"
+)
+
+// ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('cfs', 'listdir')
+const ModuleName = "cfs"
+
+// Module wraps the ConfigurableModule with specific functionality for Charm FS.
+type Module struct {
+	*core.CommonModule
+	cf *fs.FS
+}
+
+// NewModule creates a new instance of Module. It doesn't set any configuration values, nor provide any setters.
+func NewModule() *Module {
+	return &Module{
+		core.NewCommonModule(),
+		nil,
+	}
+}
+
+// NewModuleWithConfig creates a new instance of Module with the given configuration values.
+func NewModuleWithConfig(host, dataDirPath, keyFilePath string, sshPort, httpPort uint16) *Module {
+	return &Module{
+		core.NewCommonModuleWithConfig(host, dataDirPath, keyFilePath, sshPort, httpPort),
+		nil,
+	}
+}
+
+// NewModuleWithGetter creates a new instance of Module with the given configuration getters.
+func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.ConfigGetter[string]) *Module {
+	return &Module{
+		core.NewCommonModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort),
+		nil,
+	}
+}
+
+// LoadModule returns the Starlark module loader with the email-specific functions.
+func (m *Module) LoadModule() starlet.ModuleLoader {
+	additionalFuncs := starlark.StringDict{
+		//// kv ops
+		//"get":         starlark.NewBuiltin("get", m.getString),
+		//"set":         starlark.NewBuiltin("set", m.setString),
+		//"get_json":    starlark.NewBuiltin("get_json", m.getJSON),
+		//"set_json":    starlark.NewBuiltin("set_json", m.setJSON),
+		//"delete":      starlark.NewBuiltin("delete", m.deleteKey),
+		//"list":        starlark.NewBuiltin("list", m.listAll),
+		//"list_keys":   starlark.NewBuiltin("list_keys", m.listKeys),
+		//"list_values": starlark.NewBuiltin("list_values", m.listValues),
+		//// db ops
+		//"list_db": starlark.NewBuiltin("list_db", m.listDB),
+		//"sync":    starlark.NewBuiltin("sync", m.syncDB),
+		//"reset":   starlark.NewBuiltin("reset", m.resetLocalCopy),
+	}
+	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
+}
+
+var (
+	emptyStr string
+	none     = starlark.None
+)
+
+func (m *Module) getClient() (*fs.FS, error) {
+	// return the client if it's already created
+	if m.cf != nil {
+		return m.cf, nil
+	}
+
+	// create the client
+	cc, err := m.InitializeClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// create fs instance
+	cf, err := fs.NewFSWithClient(cc)
+	if err != nil {
+		return nil, err
+	}
+	m.cf = cf
+	return cf, nil
+}

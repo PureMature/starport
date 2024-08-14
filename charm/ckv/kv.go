@@ -52,12 +52,15 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"list_db":  starlark.NewBuiltin("list_db", m.listDB),
-		"get":      starlark.NewBuiltin("get", m.getString),
-		"set":      starlark.NewBuiltin("set", m.setString),
-		"get_json": starlark.NewBuiltin("get_json", m.getJSON),
-		"set_json": starlark.NewBuiltin("set_json", m.setJSON),
-		"delete":   starlark.NewBuiltin("delete", m.deleteKey),
+		"list_db":     starlark.NewBuiltin("list_db", m.listDB),
+		"get":         starlark.NewBuiltin("get", m.getString),
+		"set":         starlark.NewBuiltin("set", m.setString),
+		"get_json":    starlark.NewBuiltin("get_json", m.getJSON),
+		"set_json":    starlark.NewBuiltin("set_json", m.setJSON),
+		"delete":      starlark.NewBuiltin("delete", m.deleteKey),
+		"list":        starlark.NewBuiltin("list", m.listAll),
+		"list_keys":   starlark.NewBuiltin("list_keys", m.listKeys),
+		"list_values": starlark.NewBuiltin("list_values", m.listValues),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -264,4 +267,114 @@ func (m *Module) deleteKey(thread *starlark.Thread, b *starlark.Builtin, args st
 	// delete key
 	err = dc.Delete([]byte(key))
 	return none, err
+}
+
+func (m *Module) listItems(db string, syncFirst, keyOnly, valueOnly, reverse bool, limit int) (starlark.Value, error) {
+	// get db client
+	dc, err := m.getDBClient(db)
+	if err != nil {
+		return none, err
+	}
+
+	// sync before listing
+	if syncFirst {
+		err = dc.Sync()
+		if err != nil {
+			return none, err
+		}
+	}
+
+	// list items
+	var (
+		cnt = 0
+		res = make([]starlark.Value, 0, limit)
+	)
+	if err := dc.View(func(txn *badger.Txn) error {
+		// set iterator options
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+		opts.Reverse = reverse
+		opts.PrefetchValues = !keyOnly
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		// iterate and collect items
+		for it.Rewind(); it.Valid(); it.Next() {
+			// check limit
+			if cnt++; limit > 0 && cnt > limit {
+				break
+			}
+
+			// get key
+			item := it.Item()
+			k := item.Key()
+			if keyOnly {
+				res = append(res, starlark.String(k))
+				continue
+			}
+			// get value
+			err := item.Value(func(v []byte) error {
+				if valueOnly {
+					res = append(res, starlark.String(v))
+				} else {
+					res = append(res, starlark.Tuple{starlark.String(k), starlark.String(v)})
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return none, err
+	}
+
+	// return list
+	return starlark.NewList(res), nil
+}
+
+func (m *Module) listKeys(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var (
+		db      string
+		sync    = true
+		reverse bool
+		limit   = 0
+	)
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "db?", &db, "sync?", &sync, "reverse?", &reverse, "limit?", &limit); err != nil {
+		return none, err
+	}
+
+	// list keys
+	return m.listItems(db, sync, true, false, reverse, limit)
+}
+
+func (m *Module) listValues(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var (
+		db      string
+		sync    = true
+		reverse bool
+		limit   = 0
+	)
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "db?", &db, "sync?", &sync, "reverse?", &reverse, "limit?", &limit); err != nil {
+		return none, err
+	}
+
+	// list values
+	return m.listItems(db, sync, false, true, reverse, limit)
+}
+
+func (m *Module) listAll(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var (
+		db      string
+		sync    = true
+		reverse bool
+		limit   = 0
+	)
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "db?", &db, "sync?", &sync, "reverse?", &reverse, "limit?", &limit); err != nil {
+		return none, err
+	}
+
+	// list items
+	return m.listItems(db, sync, false, false, reverse, limit)
 }

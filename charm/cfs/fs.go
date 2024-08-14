@@ -95,8 +95,8 @@ func (m *Module) getClient() (*fs.FS, error) {
 }
 
 func (m *Module) readFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var fp string
-	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "path", &fp); err != nil {
+	var name string
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name); err != nil {
 		return nil, err
 	}
 
@@ -107,7 +107,7 @@ func (m *Module) readFile(thread *starlark.Thread, b *starlark.Builtin, args sta
 	}
 
 	// open the file for reading
-	f, err := cf.Open(fp)
+	f, err := cf.Open(name)
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +118,8 @@ func (m *Module) readFile(thread *starlark.Thread, b *starlark.Builtin, args sta
 	if err != nil {
 		return nil, err
 	}
-	if s.IsDir() {
-		return nil, fmt.Errorf("%s: cannot read a directory: %s", b.Name(), fp)
+	if !s.Mode().IsRegular() {
+		return nil, fmt.Errorf("not regular file: %s", name)
 	}
 
 	// read the content

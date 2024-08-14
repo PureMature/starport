@@ -12,7 +12,7 @@ import (
 	"go.starlark.net/starlark"
 )
 
-// CommonModule wraps the ConfigurableModule with specific functionality for sending emails.
+// CommonModule wraps the ConfigurableModule with specific functionality for Charm API client.
 type CommonModule struct {
 	cfgMod *base.ConfigurableModule[string]
 }

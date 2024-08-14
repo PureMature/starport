@@ -9,10 +9,10 @@ import (
 	"go.starlark.net/starlark"
 )
 
-// ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('cacc', 'get_id')
+// ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('cacc', 'get_bio')
 const ModuleName = "cacc"
 
-// Module wraps the ConfigurableModule with specific functionality for sending emails.
+// Module wraps the ConfigurableModule with specific functionality for Charm Accounts.
 type Module struct {
 	*core.CommonModule
 }
@@ -152,7 +152,7 @@ func (m *Module) getKeyFiles(thread *starlark.Thread, b *starlark.Builtin, args 
 	}
 
 	keyFiles := cc.AuthKeyPaths()
-	return dataconv.GoToStarlarkViaJSON(keyFiles)
+	return core.StringsToStarlarkList(keyFiles), nil
 }
 
 func (m *Module) getKeys(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {

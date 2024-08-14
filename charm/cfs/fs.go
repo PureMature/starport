@@ -5,9 +5,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	gofs "io/fs"
+	"path/filepath"
 
 	"github.com/1set/starlet"
 	"github.com/1set/starlet/dataconv"
+	tps "github.com/1set/starlet/dataconv/types"
 	"github.com/PureMature/starport/base"
 	"github.com/PureMature/starport/charm/core"
 	"github.com/charmbracelet/charm/fs"
@@ -50,10 +53,11 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"read":   starlark.NewBuiltin("read", m.readFile),
-		"write":  starlark.NewBuiltin("write", m.writeFile),
-		"remove": starlark.NewBuiltin("remove", m.removeFile),
-		"stat":   starlark.NewBuiltin("stat", m.statFile),
+		"read":    starlark.NewBuiltin("read", m.readFile),
+		"write":   starlark.NewBuiltin("write", m.writeFile),
+		"remove":  starlark.NewBuiltin("remove", m.removeFile),
+		"stat":    starlark.NewBuiltin("stat", m.statFile),
+		"listdir": starlark.NewBuiltin("listdir", m.listDirContents),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -182,5 +186,63 @@ func (m *Module) statFile(thread *starlark.Thread, b *starlark.Builtin, args sta
 	}
 
 	// convert
+	// TODO: like https://github.com/1set/starlet/blob/master/lib/file/stat.go
 	return dataconv.GoToStarlarkViaJSON(fi)
+}
+
+// listDirContents returns a list of directory contents.
+func (m *Module) listDirContents(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var (
+		path       string
+		recursive  bool
+		filterFunc = tps.NullableCallable{}
+	)
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "path", &path, "recursive?", &recursive, "filter?", &filterFunc); err != nil {
+		return nil, err
+	}
+	// get filter func
+	var ff starlark.Callable
+	if !filterFunc.IsNull() {
+		ff = filterFunc.Value()
+	}
+
+	// get the client
+	cf, err := m.getClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// scan directory contents
+	var sl []starlark.Value
+	if err := gofs.WalkDir(cf, path, func(p string, info gofs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// filter path
+		sp := starlark.String(p)
+		if ff != nil {
+			filtered, err := starlark.Call(thread, ff, starlark.Tuple{sp}, nil)
+			if err != nil {
+				return fmt.Errorf("filter %q: %w", p, err)
+			}
+			if fb, ok := filtered.(starlark.Bool); !ok {
+				return fmt.Errorf("filter %q: got %s, want bool", p, filtered.Type())
+			} else if fb == false {
+				return nil // skip path
+			}
+		}
+
+		// add path to list
+		sl = append(sl, sp)
+
+		// check if we should list recursively
+		if !recursive && p != path && info.IsDir() {
+			return filepath.SkipDir
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("%s: %w", b.Name(), err)
+	}
+	return starlark.NewList(sl), nil
 }

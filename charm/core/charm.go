@@ -48,7 +48,7 @@ func NewCommonModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort
 // ExtendModuleLoader extends the module loader with given name and additional functions.
 func (m *CommonModule) ExtendModuleLoader(name string, addons starlark.StringDict) starlet.ModuleLoader {
 	commonFuncs := starlark.StringDict{
-		"get_config": m.genBuiltin("get_config", m.getConfig),
+		"get_config": starlark.NewBuiltin("charm.get_config", m.getConfig),
 	}
 	for k, v := range addons {
 		commonFuncs[k] = v
@@ -92,10 +92,6 @@ func (m *CommonModule) InitializeClient() (*cmcli.Client, error) {
 var (
 	none = starlark.None
 )
-
-func (m *CommonModule) genBuiltin(name string, fn dataconv.StarlarkFunc) starlark.Callable {
-	return starlark.NewBuiltin(name, fn)
-}
 
 // genGetConfig generates the Starlark callable function to get the configuration value.
 func (m *CommonModule) getConfig(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {

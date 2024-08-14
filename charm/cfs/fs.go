@@ -53,11 +53,11 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"read":    starlark.NewBuiltin("read", m.readFile),
-		"write":   starlark.NewBuiltin("write", m.writeFile),
-		"remove":  starlark.NewBuiltin("remove", m.removeFile),
-		"stat":    starlark.NewBuiltin("stat", m.statFile),
-		"listdir": starlark.NewBuiltin("listdir", m.listDirContents),
+		"read":    starlark.NewBuiltin(ModuleName+".read", m.readFile),
+		"write":   starlark.NewBuiltin(ModuleName+".write", m.writeFile),
+		"remove":  starlark.NewBuiltin(ModuleName+".remove", m.removeFile),
+		"stat":    starlark.NewBuiltin(ModuleName+".stat", m.statFile),
+		"listdir": starlark.NewBuiltin(ModuleName+".listdir", m.listDirContents),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }

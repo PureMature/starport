@@ -53,18 +53,18 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
 		// kv ops
-		"get":         starlark.NewBuiltin("get", m.getString),
-		"set":         starlark.NewBuiltin("set", m.setString),
-		"get_json":    starlark.NewBuiltin("get_json", m.getJSON),
-		"set_json":    starlark.NewBuiltin("set_json", m.setJSON),
-		"delete":      starlark.NewBuiltin("delete", m.deleteKey),
-		"list":        starlark.NewBuiltin("list", m.listAll),
-		"list_keys":   starlark.NewBuiltin("list_keys", m.listKeys),
-		"list_values": starlark.NewBuiltin("list_values", m.listValues),
+		"get":         starlark.NewBuiltin(ModuleName+".get", m.getString),
+		"set":         starlark.NewBuiltin(ModuleName+".set", m.setString),
+		"get_json":    starlark.NewBuiltin(ModuleName+".get_json", m.getJSON),
+		"set_json":    starlark.NewBuiltin(ModuleName+".set_json", m.setJSON),
+		"delete":      starlark.NewBuiltin(ModuleName+".delete", m.deleteKey),
+		"list":        starlark.NewBuiltin(ModuleName+".list", m.listAll),
+		"list_keys":   starlark.NewBuiltin(ModuleName+".list_keys", m.listKeys),
+		"list_values": starlark.NewBuiltin(ModuleName+".list_values", m.listValues),
 		// db ops
-		"list_db": starlark.NewBuiltin("list_db", m.listDB),
-		"sync":    starlark.NewBuiltin("sync", m.syncDB),
-		"reset":   starlark.NewBuiltin("reset", m.resetLocalCopy),
+		"list_db": starlark.NewBuiltin(ModuleName+".list_db", m.listDB),
+		"sync":    starlark.NewBuiltin(ModuleName+".sync", m.syncDB),
+		"reset":   starlark.NewBuiltin(ModuleName+".reset", m.resetLocalCopy),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }

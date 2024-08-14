@@ -52,7 +52,7 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"list_db":     starlark.NewBuiltin("list_db", m.listDB),
+		// kv ops
 		"get":         starlark.NewBuiltin("get", m.getString),
 		"set":         starlark.NewBuiltin("set", m.setString),
 		"get_json":    starlark.NewBuiltin("get_json", m.getJSON),
@@ -61,6 +61,10 @@ func (m *Module) LoadModule() starlet.ModuleLoader {
 		"list":        starlark.NewBuiltin("list", m.listAll),
 		"list_keys":   starlark.NewBuiltin("list_keys", m.listKeys),
 		"list_values": starlark.NewBuiltin("list_values", m.listValues),
+		// db ops
+		"list_db": starlark.NewBuiltin("list_db", m.listDB),
+		"sync":    starlark.NewBuiltin("sync", m.syncDB),
+		"reset":   starlark.NewBuiltin("reset", m.resetLocalCopy),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -377,4 +381,43 @@ func (m *Module) listAll(thread *starlark.Thread, b *starlark.Builtin, args star
 
 	// list items
 	return m.listItems(db, sync, false, false, reverse, limit)
+}
+
+func (m *Module) syncDB(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var db string
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "db?", &db); err != nil {
+		return none, err
+	}
+
+	// get db client
+	dc, err := m.getDBClient(db)
+	if err != nil {
+		return none, err
+	}
+
+	// sync db
+	err = dc.Sync()
+	return none, err
+}
+
+func (m *Module) resetLocalCopy(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var db string
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "db?", &db); err != nil {
+		return none, err
+	}
+
+	// get db client
+	dc, err := m.getDBClient(db)
+	if err != nil {
+		return none, err
+	}
+
+	// reset local copy
+	if err := dc.Reset(); err != nil {
+		return none, err
+	}
+
+	// remove from cache
+	delete(m.dbs, db)
+	return none, nil
 }

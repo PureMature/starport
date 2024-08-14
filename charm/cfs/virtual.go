@@ -45,8 +45,3 @@ func CreateVirtualFile(name string, data []byte) fs.File {
 		name:   name,
 	}
 }
-
-// CreateVirtualFileFromString creates a virtual fs.File from a string
-func CreateVirtualFileFromString(name, content string) fs.File {
-	return CreateVirtualFile(name, []byte(content))
-}

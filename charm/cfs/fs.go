@@ -49,22 +49,9 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"read":  starlark.NewBuiltin("read", m.readFile),
-		"write": starlark.NewBuiltin("write", m.writeFile),
-
-		//// kv ops
-		//"get":         starlark.NewBuiltin("get", m.getString),
-		//"set":         starlark.NewBuiltin("set", m.setString),
-		//"get_json":    starlark.NewBuiltin("get_json", m.getJSON),
-		//"set_json":    starlark.NewBuiltin("set_json", m.setJSON),
-		//"delete":      starlark.NewBuiltin("delete", m.deleteKey),
-		//"list":        starlark.NewBuiltin("list", m.listAll),
-		//"list_keys":   starlark.NewBuiltin("list_keys", m.listKeys),
-		//"list_values": starlark.NewBuiltin("list_values", m.listValues),
-		//// db ops
-		//"list_db": starlark.NewBuiltin("list_db", m.listDB),
-		//"sync":    starlark.NewBuiltin("sync", m.syncDB),
-		//"reset":   starlark.NewBuiltin("reset", m.resetLocalCopy),
+		"read":   starlark.NewBuiltin("read", m.readFile),
+		"write":  starlark.NewBuiltin("write", m.writeFile),
+		"remove": starlark.NewBuiltin("remove", m.removeFile),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -147,5 +134,22 @@ func (m *Module) writeFile(thread *starlark.Thread, b *starlark.Builtin, args st
 	// write as file
 	vf := CreateVirtualFileFromString(name, content)
 	err = cf.WriteFile(name, vf)
+	return none, err
+}
+
+func (m *Module) removeFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var name string
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name); err != nil {
+		return nil, err
+	}
+
+	// get the client
+	cf, err := m.getClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// delete the file
+	err = cf.Remove(name)
 	return none, err
 }

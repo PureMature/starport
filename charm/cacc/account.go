@@ -12,7 +12,7 @@ import (
 // ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('cacc', 'get_bio')
 const ModuleName = "cacc"
 
-// Module wraps the ConfigurableModule with specific functionality for sending emails.
+// Module wraps the ConfigurableModule with specific functionality for Charm Accounts.
 type Module struct {
 	*core.CommonModule
 }

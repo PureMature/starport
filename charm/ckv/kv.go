@@ -16,10 +16,10 @@ import (
 	"go.starlark.net/starlark"
 )
 
-// ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('ckv', 'get_id')
+// ModuleName defines the expected name for this module when used in Starlark's load() function, e.g., load('ckv', 'list_db')
 const ModuleName = "ckv"
 
-// Module wraps the ConfigurableModule with specific functionality for sending emails.
+// Module wraps the ConfigurableModule with specific functionality for Charm KV.
 type Module struct {
 	*core.CommonModule
 	dbs map[string]*kv.KV

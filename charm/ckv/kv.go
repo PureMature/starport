@@ -52,12 +52,12 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"list_db":  m.genBuiltin("list_db", m.listDB),
-		"get":      m.genBuiltin("get", m.getString),
-		"set":      m.genBuiltin("set", m.setString),
-		"get_json": m.genBuiltin("get_json", m.getJSON),
-		"set_json": m.genBuiltin("set_json", m.setJSON),
-		"delete":   m.genBuiltin("delete", m.deleteKey),
+		"list_db":  starlark.NewBuiltin("list_db", m.listDB),
+		"get":      starlark.NewBuiltin("get", m.getString),
+		"set":      starlark.NewBuiltin("set", m.setString),
+		"get_json": starlark.NewBuiltin("get_json", m.getJSON),
+		"set_json": starlark.NewBuiltin("set_json", m.setJSON),
+		"delete":   starlark.NewBuiltin("delete", m.deleteKey),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -101,10 +101,6 @@ func (m *Module) getDBClient(name string) (*kv.KV, error) {
 	}
 	m.dbs[name] = db
 	return db, nil
-}
-
-func (m *Module) genBuiltin(name string, fn dataconv.StarlarkFunc) starlark.Callable {
-	return starlark.NewBuiltin(name, fn)
 }
 
 func (m *Module) listDB(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -218,13 +214,18 @@ func (m *Module) getJSON(thread *starlark.Thread, b *starlark.Builtin, args star
 	}
 
 	// get value as string
-	value, err := m.getValue(key, db)
+	vs, err := m.getValue(key, db)
 	if err != nil {
 		return none, err
 	}
 
+	// for unset key, return None
+	if vs == emptyStr {
+		return none, nil
+	}
+
 	// parse JSON
-	return dataconv.DecodeStarlarkJSON([]byte(value))
+	return dataconv.DecodeStarlarkJSON([]byte(vs))
 }
 
 func (m *Module) setJSON(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {

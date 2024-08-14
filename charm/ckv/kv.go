@@ -52,14 +52,17 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"list_db": m.genBuiltin("list_db", m.listDB),
-		"get":     m.genBuiltin("get", m.getString),
-		"set":     m.genBuiltin("set", m.setString),
+		"list_db":  m.genBuiltin("list_db", m.listDB),
+		"get":      m.genBuiltin("get", m.getString),
+		"set":      m.genBuiltin("set", m.setString),
+		"get_json": m.genBuiltin("get_json", m.getJSON),
+		"set_json": m.genBuiltin("set_json", m.setJSON),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
 
 var (
+	emptyStr  string
 	none      = starlark.None
 	defaultDB = "starcli.kv.user.default"
 )
@@ -139,6 +142,39 @@ func (m *Module) listDB(thread *starlark.Thread, b *starlark.Builtin, args starl
 	return core.StringsToStarlarkList(dbList), nil
 }
 
+func (m *Module) getValue(key, db string) (string, error) {
+	// get db client
+	dc, err := m.getDBClient(db)
+	if err != nil {
+		return emptyStr, err
+	}
+
+	// get value
+	val, err := dc.Get([]byte(key))
+	if err != nil {
+		if nf := errors.Is(err, badger.ErrKeyNotFound); nf {
+			return emptyStr, nil
+		}
+		return emptyStr, err
+	}
+	return string(val), nil
+}
+
+func (m *Module) setValue(key, value, db string) error {
+	// get db client
+	dc, err := m.getDBClient(db)
+	if err != nil {
+		return err
+	}
+
+	// set value
+	err = dc.Set([]byte(key), []byte(value))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (m *Module) getString(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var (
 		key string
@@ -148,21 +184,12 @@ func (m *Module) getString(thread *starlark.Thread, b *starlark.Builtin, args st
 		return none, err
 	}
 
-	// get db client
-	dc, err := m.getDBClient(db)
-	if err != nil {
-		return none, err
-	}
-
 	// get value
-	val, err := dc.Get([]byte(key))
+	vs, err := m.getValue(key, db)
 	if err != nil {
-		if nf := errors.Is(err, badger.ErrKeyNotFound); nf {
-			return none, nil
-		}
 		return none, err
 	}
-	return starlark.String(val), nil
+	return starlark.String(vs), nil
 }
 
 func (m *Module) setString(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -175,16 +202,44 @@ func (m *Module) setString(thread *starlark.Thread, b *starlark.Builtin, args st
 		return none, err
 	}
 
-	// get db client
-	dc, err := m.getDBClient(db)
+	// set value
+	err := m.setValue(key, value, db)
+	return none, err
+}
+
+func (m *Module) getJSON(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var (
+		key string
+		db  string
+	)
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "db?", &db); err != nil {
+		return none, err
+	}
+
+	// get value as string
+	value, err := m.getValue(key, db)
 	if err != nil {
 		return none, err
 	}
 
-	// set value
-	err = dc.Set([]byte(key), []byte(value))
+	// parse JSON
+	return dataconv.DecodeStarlarkJSON([]byte(value))
+}
+
+func (m *Module) setJSON(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var (
+		key   string
+		value starlark.Value
+		db    string
+	)
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "value", &value, "db?", &db); err != nil {
+		return none, err
+	}
+
+	// convert value to JSON
+	js, err := dataconv.EncodeStarlarkJSON(value)
 	if err != nil {
 		return none, err
 	}
-	return none, nil
+	return none, m.setValue(key, js, db)
 }

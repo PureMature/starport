@@ -57,6 +57,7 @@ func (m *Module) LoadModule() starlet.ModuleLoader {
 		"set":      m.genBuiltin("set", m.setString),
 		"get_json": m.genBuiltin("get_json", m.getJSON),
 		"set_json": m.genBuiltin("set_json", m.setJSON),
+		"delete":   m.genBuiltin("delete", m.deleteKey),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -88,7 +89,7 @@ func (m *Module) getDBClient(name string) (*kv.KV, error) {
 		return nil, err
 	}
 	pn := filepath.Join(dd, "/kv/", name)
-	// for BadgerDB
+	// BadgerDB options
 	opts := badger.DefaultOptions(pn).WithLoggingLevel(badger.ERROR)
 	opts.Logger = nil
 	opts = opts.WithValueLogFileSize(10000000)
@@ -242,4 +243,24 @@ func (m *Module) setJSON(thread *starlark.Thread, b *starlark.Builtin, args star
 		return none, err
 	}
 	return none, m.setValue(key, js, db)
+}
+
+func (m *Module) deleteKey(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var (
+		key string
+		db  string
+	)
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "key", &key, "db?", &db); err != nil {
+		return none, err
+	}
+
+	// get db client
+	dc, err := m.getDBClient(db)
+	if err != nil {
+		return none, err
+	}
+
+	// delete key
+	err = dc.Delete([]byte(key))
+	return none, err
 }

@@ -49,7 +49,8 @@ func NewModuleWithGetter(host, dataDirPath, keyFilePath, sshPort, httpPort base.
 // LoadModule returns the Starlark module loader with the email-specific functions.
 func (m *Module) LoadModule() starlet.ModuleLoader {
 	additionalFuncs := starlark.StringDict{
-		"read": starlark.NewBuiltin("read", m.readFile),
+		"read":  starlark.NewBuiltin("read", m.readFile),
+		"write": starlark.NewBuiltin("write", m.writeFile),
 
 		//// kv ops
 		//"get":         starlark.NewBuiltin("get", m.getString),
@@ -114,12 +115,12 @@ func (m *Module) readFile(thread *starlark.Thread, b *starlark.Builtin, args sta
 	defer f.Close() // nolint:errcheck
 
 	// check the file
-	s, err := f.Stat()
+	fi, err := f.Stat()
 	if err != nil {
 		return nil, err
 	}
-	if !s.Mode().IsRegular() {
-		return nil, fmt.Errorf("not regular file: %s", name)
+	if fi.IsDir() {
+		return nil, fmt.Errorf("is a directory: %s", name)
 	}
 
 	// read the content
@@ -129,4 +130,22 @@ func (m *Module) readFile(thread *starlark.Thread, b *starlark.Builtin, args sta
 		return nil, err
 	}
 	return starlark.String(buf.Bytes()), nil
+}
+
+func (m *Module) writeFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var name, content string
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name, "content", &content); err != nil {
+		return nil, err
+	}
+
+	// get the client
+	cf, err := m.getClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// write as file
+	vf := CreateVirtualFileFromString(name, content)
+	err = cf.WriteFile(name, vf)
+	return none, err
 }

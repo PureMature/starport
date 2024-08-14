@@ -3,6 +3,7 @@ package cfs
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 
 	"github.com/1set/starlet"
@@ -105,13 +106,24 @@ func (m *Module) readFile(thread *starlark.Thread, b *starlark.Builtin, args sta
 		return nil, err
 	}
 
-	// read the file content
-	buf := bytes.NewBuffer(nil)
+	// open the file for reading
 	f, err := cf.Open(fp)
 	if err != nil {
 		return nil, err
 	}
-	// cfs.read("/mybatch")
+	defer f.Close() // nolint:errcheck
+
+	// check the file
+	s, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if s.IsDir() {
+		return nil, fmt.Errorf("%s: cannot read a directory: %s", b.Name(), fp)
+	}
+
+	// read the content
+	buf := bytes.NewBuffer(nil)
 	_, err = io.Copy(buf, f)
 	if err != nil {
 		return nil, err

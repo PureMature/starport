@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/1set/starlet"
+	"github.com/1set/starlet/dataconv"
 	"github.com/PureMature/starport/base"
 	"github.com/PureMature/starport/charm/core"
 	"github.com/charmbracelet/charm/fs"
@@ -52,6 +53,7 @@ func (m *Module) LoadModule() starlet.ModuleLoader {
 		"read":   starlark.NewBuiltin("read", m.readFile),
 		"write":  starlark.NewBuiltin("write", m.writeFile),
 		"remove": starlark.NewBuiltin("remove", m.removeFile),
+		"stat":   starlark.NewBuiltin("stat", m.statFile),
 	}
 	return m.ExtendModuleLoader(ModuleName, additionalFuncs)
 }
@@ -94,7 +96,7 @@ func (m *Module) readFile(thread *starlark.Thread, b *starlark.Builtin, args sta
 		return nil, err
 	}
 
-	// open the file for reading
+	// open file for reading
 	f, err := cf.Open(name)
 	if err != nil {
 		return nil, err
@@ -152,4 +154,33 @@ func (m *Module) removeFile(thread *starlark.Thread, b *starlark.Builtin, args s
 	// delete the file
 	err = cf.Remove(name)
 	return none, err
+}
+
+func (m *Module) statFile(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var name string
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "name", &name); err != nil {
+		return nil, err
+	}
+
+	// get the client
+	cf, err := m.getClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// open file for stat
+	f, err := cf.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close() // nolint:errcheck
+
+	// get file info
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	// convert
+	return dataconv.GoToStarlarkViaJSON(fi)
 }
